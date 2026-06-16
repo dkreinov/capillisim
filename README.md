@@ -41,5 +41,6 @@ this project. Details in `docs/PRIOR_ART.md`.
 
 - `docs/PRIOR_ART.md` — what exists, what's novel.
 - `docs/ARCHITECTURE.md` — components, data flow, the portable-core split, math.
+- `docs/POC_OPERATION.md` — how projector + phone + PC connect and run the loop.
 - `docs/HARDWARE.md` — the physical rig and the specs we still need.
 - `docs/ROADMAP.md` — phased scope, milestones, and the POC success criteria.

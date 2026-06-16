@@ -34,11 +34,15 @@ math and frame rendering are implemented and unit-tested headless; putting the
 frame fullscreen on the real projector is the remaining hardware step.
 **Deliverable:** project a plan at true size and light up any chosen cell.
 
-### M3 — The interactive loop (this is the POC)
+### M3 — The interactive loop (this is the POC) *(logic done; phone capture pending)*
 Phone MJPEG stream → detect cap → read color (glare-robust) → match to best empty
 cell or reject → highlight → manual confirm → persist. Wire M1 + M2 + vision
-together. **Deliverable:** the full small-grid loop meeting the success criteria
-above.
+together. The matcher, the glare-robust color reader, and the full loop are
+implemented and tested headless (run_loop with injected I/O); a narrated
+simulation places and rejects synthetic caps end to end. Remaining: grab frames
+from a real phone stream (OpenCV), put the projector frame fullscreen, and tune
+the reject threshold against real caps. **Deliverable:** the full small-grid
+loop meeting the success criteria above. See `docs/POC_OPERATION.md`.
 
 ### M4 — Enhancements
 - Brand/logo recognition (the deferred request): a classifier + cap dataset;
