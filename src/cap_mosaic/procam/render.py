@@ -67,13 +67,19 @@ def _glow(draw, cal, cell, r_mm):
     draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=HIGHLIGHT, width=4)
 
 
-def display_fullscreen(img: Image.Image) -> None:  # pragma: no cover - needs a display
-    """Show `img` fullscreen on the projector output (real-rig only).
+def display_fullscreen(
+    img: Image.Image, monitor_x: int = 0, hold_ms: int = 0
+) -> None:  # pragma: no cover - needs a display
+    """Show `img` fullscreen on the projector once (real-rig only).
 
-    Implemented with a GUI toolkit at integration time (e.g. an OpenCV or pygame
-    fullscreen window placed on the projector's screen). Kept out of the pure
-    render path so the rest of the module tests headless.
+    A one-shot convenience (e.g. for calibration test patterns). For the live
+    build loop, hold a single :class:`cap_mosaic.procam.display.Projector` open
+    and call ``show`` per frame instead of recreating the window each time.
+    ``hold_ms=0`` blocks until a key is pressed.
     """
-    raise NotImplementedError(
-        "fullscreen display is wired up on the physical rig (Milestone 2 hardware step)"
-    )
+    from .display import Projector  # noqa: PLC0415
+
+    proj = Projector(monitor_x=monitor_x)
+    proj.show(img, 1)
+    proj.wait_key(hold_ms)
+    proj.close()

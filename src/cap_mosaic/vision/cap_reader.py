@@ -9,8 +9,10 @@ grabber (OpenCV) is a thin, lazily-imported shell function.
 
 from __future__ import annotations
 
+import base64
 import io
 import urllib.request
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 import numpy as np
 from PIL import Image
@@ -44,9 +46,27 @@ def grab_snapshot(url: str, timeout: float = 5.0) -> Image.Image:
     Works with just the standard library + Pillow (no OpenCV), which makes it the
     lowest-friction way to confirm the phone <-> PC link on the same network. The
     URL is the IP-webcam app's still-image endpoint, e.g.
-    ``http://192.168.1.42:8080/shot.jpg``.
+    ``http://192.168.1.42:8080/shot.jpg``. If the app has a login set, embed the
+    credentials in the URL (``http://user:pass@host:8080/shot.jpg``); a username
+    containing ``@`` should be percent-encoded as ``%40``. The credentials are
+    pulled out and sent as an HTTP Basic ``Authorization`` header, since
+    ``urlopen`` does not handle inline userinfo itself.
     """
-    with urllib.request.urlopen(url, timeout=timeout) as resp:  # noqa: S310
+    parts = urlsplit(url)
+    headers = {}
+    netloc = parts.netloc
+    if "@" in netloc:
+        userinfo, netloc = netloc.rsplit("@", 1)
+        user, _, pwd = userinfo.partition(":")
+        token = base64.b64encode(
+            f"{unquote(user)}:{unquote(pwd)}".encode()
+        ).decode()
+        headers["Authorization"] = f"Basic {token}"
+    clean_url = urlunsplit(
+        (parts.scheme, netloc, parts.path, parts.query, parts.fragment)
+    )
+    req = urllib.request.Request(clean_url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
         data = resp.read()
     return Image.open(io.BytesIO(data)).convert("RGB")
 
