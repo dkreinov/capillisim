@@ -14,7 +14,10 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+from ..core.palette import RGB
 from . import card_layout as L
+
+GLARE_LEVEL = 240  # pixels brighter than this in all channels are treated as glare
 
 _DETECTOR: "cv2.aruco.ArucoDetector | None" = None
 
@@ -100,3 +103,30 @@ def white_balance(rgb: np.ndarray, h: np.ndarray) -> np.ndarray:
         a, b = np.polyfit(obs[:, c], exp[:, c], 1)
         out[..., c] = a * out[..., c] + b
     return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def read_cap_color(
+    rgb: np.ndarray, h: np.ndarray, glare_level: int = GLARE_LEVEL
+) -> RGB | None:
+    """Robust dominant colour of the cap in the placement circle, or None.
+
+    Samples the inner 70% of the circle (avoiding the printed outline), masks
+    specular glare, and returns the median colour. Run on a white-balanced frame.
+    """
+    cx, cy, r = _region_px(h, L.CIRCLE_CX_MM, L.CIRCLE_CY_MM, L.CIRCLE_R_MM)
+    inner = r * 0.70
+    img_h, img_w = rgb.shape[:2]
+    y0, y1 = max(0, int(cy - inner)), min(img_h, int(cy + inner) + 1)
+    x0, x1 = max(0, int(cx - inner)), min(img_w, int(cx + inner) + 1)
+    if y1 <= y0 or x1 <= x0:
+        return None
+    crop = rgb[y0:y1, x0:x1].reshape(-1, 3)
+    yy, xx = np.mgrid[y0:y1, x0:x1]
+    circle = ((xx - cx) ** 2 + (yy - cy) ** 2 <= inner**2).reshape(-1)
+    pixels = crop[circle]
+    if pixels.size == 0:
+        return None
+    not_glare = ~np.all(pixels > glare_level, axis=1)
+    sample = pixels[not_glare] if not_glare.any() else pixels
+    med = np.median(sample, axis=0)
+    return (int(med[0]), int(med[1]), int(med[2]))
