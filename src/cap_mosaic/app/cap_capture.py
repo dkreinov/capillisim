@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import threading
 import time
 from pathlib import Path
 
@@ -22,6 +23,16 @@ import cv2
 
 from ..core.palette import nearest
 from ..vision.card_reader import crop_cap, detect_card, read_cap_color, white_balance
+
+
+def _ding():
+    """A rising two-tone confirmation that a cap was saved."""
+    import winsound
+    try:
+        winsound.Beep(880, 110)
+        winsound.Beep(1320, 150)
+    except Exception:
+        pass
 
 
 def _next_index(crops_dir: Path) -> int:
@@ -57,6 +68,8 @@ def main(argv: list[str] | None = None) -> None:
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.cam_height)
     print(f"cap capture -> {out}  (start index {idx}). SPACE=save, Q=quit.", flush=True)
 
+    flash_until = 0.0
+    flash_msg = ""
     try:
         while True:
             ok, bgr = cap.read()
@@ -71,8 +84,15 @@ def main(argv: list[str] | None = None) -> None:
                 col = None
             else:
                 col = read_cap_color(white_balance(rgb, h), h)
-                cv2.putText(preview, f"cap #{idx}  rgb{col} ~{nearest(col).name}  SPACE=save",
+                # corrected-colour swatch so you can see it is white-balanced
+                cv2.rectangle(preview, (500, 232), (632, 348), (col[2], col[1], col[0]), -1)
+                cv2.rectangle(preview, (500, 232), (632, 348), (255, 255, 255), 2)
+                cv2.putText(preview, "corrected", (502, 226), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                cv2.putText(preview, f"cap #{idx}  ~{nearest(col).name}  SPACE=save",
                             (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (60, 235, 90), 2)
+            if time.time() < flash_until:  # green SAVED confirmation
+                cv2.rectangle(preview, (3, 3), (637, 357), (60, 235, 90), 6)
+                cv2.putText(preview, flash_msg, (170, 195), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (60, 235, 90), 3)
             cv2.imshow("cap capture", preview)
             k = cv2.waitKey(30) & 0xFF
             if k in (ord("q"), 27):
@@ -94,6 +114,8 @@ def main(argv: list[str] | None = None) -> None:
                     time.sleep(0.05)
                 with open(labels, "a", newline="") as f:
                     csv.writer(f).writerow([idx, *col, nearest(col).name, saved])
+                threading.Thread(target=_ding, daemon=True).start()
+                flash_msg, flash_until = f"SAVED #{idx}", time.time() + 0.8
                 print(f"  saved cap #{idx}: {saved} crops  rgb{col} ~{nearest(col).name}", flush=True)
                 idx += 1
     finally:
