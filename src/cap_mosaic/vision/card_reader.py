@@ -22,6 +22,16 @@ from . import card_layout as L
 GLARE_LEVEL = 240  # pixels brighter than this in all channels are treated as glare
 MARKING_MIN_DE = 8.0  # field/marking clusters closer than this -> cap is one colour
 
+# Presence detection (a cap can't be told from the white card circle by
+# brightness alone). A real cap adds colour (saturated pixels) and/or texture
+# (luma variance); the empty printed circle is flat white with a thin gray
+# crosshair. Tuned on synthetic frames; expose via the capture preview for rig
+# calibration. NOTE: a perfectly plain matte-white cap with no marking is still
+# ambiguous here — the gray placement-circle card option is the fix for that.
+SAT_LEVEL = 40  # per-pixel (max-min) above which a pixel counts as coloured
+SAT_FRAC = 0.10  # fraction of coloured inner pixels that signals a cap
+STD_LEVEL = 18.0  # inner-circle luma std above which texture signals a cap
+
 _DETECTOR: "cv2.aruco.ArucoDetector | None" = None
 
 
@@ -197,6 +207,35 @@ def read_cap_field(
         return (int(med[0]), int(med[1]), int(med[2])), 0.0, float(spread)
     marking_frac = float(counts[1 - big] / counts.sum())
     return field_rgb, marking_frac, float(spread)
+
+
+def presence_metrics(rgb: np.ndarray, h: np.ndarray) -> tuple[float, float] | None:
+    """(coloured-pixel fraction, luma std) inside the placement circle, or None."""
+    px = _inner_circle_pixels(rgb, h)
+    if px is None:
+        return None
+    px = px.astype(np.int16)
+    sat = px.max(1) - px.min(1)
+    return float((sat > SAT_LEVEL).mean()), float(px.mean(1).std())
+
+
+def cap_present(
+    rgb: np.ndarray,
+    h: np.ndarray,
+    sat_frac: float = SAT_FRAC,
+    std_level: float = STD_LEVEL,
+) -> bool:
+    """True if a cap is on the card — by colour/texture, not brightness.
+
+    A white cap reads as bright as the empty white circle, so brightness can't
+    decide presence. Instead, a cap shows colour (saturated pixels) and/or
+    texture (luma variance) that the flat printed circle lacks.
+    """
+    m = presence_metrics(rgb, h)
+    if m is None:
+        return False
+    frac, std = m
+    return bool(frac > sat_frac or std > std_level)
 
 
 def crop_cap(rgb: np.ndarray, h: np.ndarray, size: int = 128) -> np.ndarray | None:

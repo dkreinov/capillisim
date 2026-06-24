@@ -11,6 +11,7 @@ from cap_mosaic.app.make_card import render_card
 from cap_mosaic.core.palette import ciede2000, rgb_to_lab
 from cap_mosaic.vision import card_layout as L
 from cap_mosaic.vision.card_reader import (
+    cap_present,
     detect_card,
     read_cap_color,
     read_cap_field,
@@ -74,3 +75,27 @@ def test_read_field_uniform_cap_has_near_zero_marking():
     field_rgb, marking_frac, _ = out
     assert ciede2000(rgb_to_lab(field_rgb), rgb_to_lab(field)) < 12
     assert marking_frac < 0.1, marking_frac
+
+
+def test_presence_empty_circle_is_absent():
+    # render_card with no cap drawn -> the printed white circle is "empty"
+    ppm = 200 / 25.4
+    from cap_mosaic.app.make_card import render_card
+
+    frame = np.asarray(render_card(200))
+    h = detect_card(frame)
+    assert h is not None
+    assert cap_present(frame, h) is False
+
+
+def test_presence_white_logo_cap_is_detected():
+    field = (235, 235, 235)
+    frame, _ = _card_with_cap(field, logo_rgb=(200, 40, 40), logo_frac=0.5)
+    h = detect_card(frame)
+    assert cap_present(frame, h) is True
+
+
+def test_presence_uniform_colored_cap_is_detected():
+    frame, _ = _card_with_cap((60, 110, 170))  # plain blue, saturated
+    h = detect_card(frame)
+    assert cap_present(frame, h) is True
