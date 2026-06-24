@@ -93,7 +93,7 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(f"could not open camera index {args.camera}")
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.cam_width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.cam_height)
-    print(f"cap capture -> {out}  (start index {idx}). SPACE=save, Q=quit.", flush=True)
+    print(f"cap capture -> {out}  (start index {idx}). SPACE=save, Z=undo last, Q=quit.", flush=True)
 
     flash_until = 0.0
     flash_msg = ""
@@ -190,6 +190,13 @@ def main(argv: list[str] | None = None) -> None:
                 break
             if k == 32 and h is not None and col is not None:
                 save_cap(h, col)
+            if k == ord("z"):  # undo: remove the most recently saved cap
+                last = db.last_cap_id()
+                if last is not None and db.delete_cap(last):
+                    idx = _next_index(crops)
+                    captured = False
+                    flash_msg, flash_until = f"REMOVED #{last}", time.time() + 0.8
+                    print(f"  removed cap #{last}", flush=True)
     finally:
         cap.release()
         cv2.destroyAllWindows()

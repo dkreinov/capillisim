@@ -105,6 +105,26 @@ def test_ambiguous_flag(tmp_path):
         assert by_std.is_ambiguous is True
 
 
+def test_delete_cap_removes_row_frames_and_crops(tmp_path):
+    crop = tmp_path / "cap_0000_f0.png"
+    crop.write_bytes(b"x")
+    with CapDataset(tmp_path / "caps.db") as db:
+        keep = db.add_cap((1, 2, 3), captured_at="t")
+        drop = db.add_cap(
+            (9, 9, 9), [FrameRecord(0, str(crop))], captured_at="t"
+        )
+        assert db.last_cap_id() == drop
+        assert db.delete_cap(drop) is True
+        assert db.count() == 1
+        assert db.last_cap_id() == keep
+        assert not crop.exists()  # crop file removed from disk
+        # its frames are gone too (cascade)
+        assert db.conn.execute(
+            "SELECT COUNT(*) FROM frame WHERE cap_id = ?", (drop,)
+        ).fetchone()[0] == 0
+        assert db.delete_cap(9999) is False  # unknown id
+
+
 def test_reopen_is_idempotent(tmp_path):
     path = tmp_path / "caps.db"
     with CapDataset(path) as db:

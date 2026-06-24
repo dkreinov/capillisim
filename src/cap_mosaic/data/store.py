@@ -235,6 +235,35 @@ class CapDataset:
         )
         self.conn.commit()
 
+    def delete_cap(self, cap_id: int, remove_crops: bool = True) -> bool:
+        """Remove a cap (and its frames/embeddings); returns False if not found.
+
+        Also deletes the cap's crop PNGs from disk when ``remove_crops`` is set,
+        so an unwanted/misread cap leaves nothing behind.
+        """
+        paths = [
+            r["path"]
+            for r in self.conn.execute(
+                "SELECT path FROM frame WHERE cap_id = ?", (cap_id,)
+            )
+        ]
+        cur = self.conn.execute("DELETE FROM cap WHERE id = ?", (cap_id,))
+        self.conn.commit()
+        if cur.rowcount == 0:
+            return False
+        if remove_crops:
+            for p in paths:
+                try:
+                    Path(p).unlink()
+                except OSError:
+                    pass
+        return True
+
+    def last_cap_id(self) -> int | None:
+        """Id of the most recently added cap, or None if the dataset is empty."""
+        row = self.conn.execute("SELECT id FROM cap ORDER BY id DESC LIMIT 1").fetchone()
+        return row["id"] if row else None
+
     # ── reading ──────────────────────────────────────────────────────────────
 
     def get_meta(self, key: str, default: str | None = None) -> str | None:
