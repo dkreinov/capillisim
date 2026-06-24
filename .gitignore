@@ -22,3 +22,5 @@ plans/
 calibration/
 # generated distance-preview images
 previews/
+# captured cap dataset (crops + labels + contact sheet)
+dataset/

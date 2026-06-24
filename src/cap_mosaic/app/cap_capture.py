@@ -8,7 +8,8 @@ for a palette / inventory / embedding dataset.
     python -m cap_mosaic.app.cap_capture --out dataset --camera 0
 
 Writes ``<out>/crops/cap_<NNNN>_f<k>.png`` and appends to ``<out>/labels.csv``
-(index, r, g, b, nearest_palette, n_frames). Re-running resumes the index.
+(index, r, g, b, n_frames) with the true measured colour — no palette
+bucketing at capture time. Re-running resumes the index.
 """
 
 from __future__ import annotations
@@ -21,7 +22,6 @@ from pathlib import Path
 
 import cv2
 
-from ..core.palette import nearest
 from ..vision.card_reader import crop_cap, detect_card, read_cap_color, white_balance
 
 
@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> None:
     labels = out / "labels.csv"
     if not labels.exists():
         with open(labels, "w", newline="") as f:
-            csv.writer(f).writerow(["index", "r", "g", "b", "nearest", "n_frames"])
+            csv.writer(f).writerow(["index", "r", "g", "b", "n_frames"])
     idx = _next_index(crops)
 
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
@@ -96,10 +96,10 @@ def main(argv: list[str] | None = None) -> None:
             saved += 1
             time.sleep(0.04)
         with open(labels, "a", newline="") as f:
-            csv.writer(f).writerow([idx, *col_use, nearest(col_use).name, saved])
+            csv.writer(f).writerow([idx, *col_use, saved])
         threading.Thread(target=_ding, daemon=True).start()
         flash_msg, flash_until = f"SAVED #{idx}", time.time() + 0.8
-        print(f"  saved cap #{idx}: {saved} crops  rgb{col_use} ~{nearest(col_use).name}", flush=True)
+        print(f"  saved cap #{idx}: {saved} crops  rgb{col_use}", flush=True)
         idx += 1
 
     def is_empty(col):  # white circle showing through = no cap
@@ -122,7 +122,7 @@ def main(argv: list[str] | None = None) -> None:
                 cv2.rectangle(preview, (500, 232), (632, 348), (255, 255, 255), 2)
                 cv2.putText(preview, "corrected", (502, 226), FONT, 0.5, (255, 255, 255), 1)
                 empty = is_empty(col)
-                label = "empty (no cap)" if empty else f"cap #{idx}  ~{nearest(col).name}"
+                label = "empty (no cap)" if empty else f"cap #{idx}  rgb{col}"
                 mode = "AUTO" if args.auto else "SPACE=save"
                 cv2.putText(preview, f"{label}   [{mode}]", (12, 28), FONT, 0.6,
                             (170, 170, 170) if empty else (60, 235, 90), 2)

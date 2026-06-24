@@ -41,6 +41,26 @@ the novel contribution.
 - **Mozaico AR** and **Houzz** tile AR let you preview a finished mosaic in a
   room. Visualization only; no assembly guidance.
 
+### Pointillism & optical colour mixing — old art, well-studied technique
+Cap mosaics are pointillism with large tiles, so the pointillist literature
+applies directly and informs our colour-matching (`COLOR_MATCHING.md`):
+- **Optical mixing.** Small juxtaposed colour elements blend in the eye into a
+  new colour when viewed at distance — used in mosaics since the 5th century and
+  the basis of Seurat's pointillism. Works specifically with **fixed-colour
+  discrete elements** (tiles, beads, caps), which is exactly our medium. Below a
+  critical angular size the eye cannot resolve individual tiles, only the local
+  average colour.
+- **Limited palettes work.** Seurat used **≤11 colours**; a digital pointillism
+  pipeline (Stanford EE368, Hong & Liu) uses ~16 primaries with the first 8 from
+  **k-means clustering** — corroborating our planner's palette-quantization
+  approach and the decision to cluster the *actual* cap inventory per painting.
+- **Dot density ↔ viewing distance.** These methods explicitly compute the tile
+  density needed to keep the subject legible at the **intended viewing distance**
+  — the same coupling we rely on (`SIZING_AND_VIEWING.md`, `COLOR_MATCHING.md`).
+- **Hue errors are the visible failure mode.** Optical mixing tolerates
+  lightness/chroma error but punishes hue error — motivating a hue-weighted
+  reject gate rather than a single scalar ΔE (`COLOR_MATCHING.md`).
+
 ## The gap we fill (novelty)
 
 No existing system combines all three of:
@@ -61,3 +81,6 @@ building and the part that is plausibly original.
 - https://twincoastmetrology.com/products/projection/software/
 - https://www.mozaico.com/blogs/news/the-future-of-mosaic-shopping-explore-visualize-and-buy-with-our-new-ar-app
 - https://royfeinson.com/bottle-cap-mosaics/
+- https://web.stanford.edu/class/ee368/Project_Autumn_1516/Reports/Hong_Liu.pdf
+- https://www.beyondeveryart.com/pointillism-optical-mixing-vs-pigment-mixing/
+- https://alvalyn.com/optical-color-mixing/
