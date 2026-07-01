@@ -38,6 +38,9 @@ async function upload(file) {
   imageId = b.id;
   aspect = b.aspect;
   dz.querySelector("p").innerHTML = `loaded ${b.width}×${b.height}<br/><small>drop another to replace</small>`;
+  const orig = $("orig");
+  orig.src = URL.createObjectURL(file);
+  orig.hidden = false;
   $("controls").hidden = false;
   $("stats").hidden = false;
   $("bomwrap").hidden = false;

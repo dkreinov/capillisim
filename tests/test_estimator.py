@@ -24,7 +24,10 @@ def test_valid_size_is_legible_no_warning():
 def test_too_small_size_warns_cannot_represent():
     r = estimator.solve_from_size(_fine_checker(), width_mm=250)  # ~7 caps across
     assert r["legible"] is False
-    assert r["warning"] and "any distance" in r["warning"]
+    assert r["warning"] and "Too few caps" in r["warning"]
+    # a large enough size is always representable
+    big = estimator.solve_from_size(_fine_checker(), width_mm=6000)
+    assert big["legible"] is True and big["warning"] is None
 
 
 def test_distance_gives_size_and_read_quality():

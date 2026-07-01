@@ -11,6 +11,7 @@ main { display:grid; grid-template-columns:340px 1fr; gap:20px; padding:18px 26p
 .dropzone.hot { border-color:var(--acc); color:var(--ink); background:#20242f; }
 .dropzone small { color:var(--mut); }
 
+.orig { display:block; width:100%; margin-top:12px; border-radius:12px; border:1px solid #333a49; }
 .controls { margin-top:18px; background:var(--panel); border-radius:14px; padding:16px; }
 .mode { display:flex; gap:16px; margin-bottom:12px; color:var(--mut); }
 .slider { display:block; margin:14px 0; color:var(--mut); }

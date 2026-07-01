@@ -72,9 +72,11 @@ def solve_from_size(
     d_fov = sizing.fov_distance(width_mm / 1000.0, fov_deg)
     warning = None
     if not legible:
+        need_m = floor * pitch_mm / 1000.0
         warning = (
-            f"Too few caps ({caps_across} < {floor} needed); the image can't be "
-            f"represented at this size and won't read from any distance."
+            f"Too few caps at this size ({caps_across} < {floor} needed). Make it "
+            f"at least {need_m:.1f} m wide (or use Pattern mode) to represent this "
+            f"image — any image is representable given enough caps."
         )
     return {
         "width_mm": round(width_mm, 1),

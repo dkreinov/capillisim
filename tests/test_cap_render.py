@@ -17,10 +17,13 @@ def _plan():
     return plan_from_image(img, grid)
 
 
-def test_build_library_covers_palette_without_db():
+def test_build_library_makes_variants_per_colour():
     colors = [(200, 30, 30), (30, 80, 160), (230, 200, 70)]
-    lib = cap_render.build_library(colors, db_path=None, size=48)
-    assert len(lib) == 3
+    lib = cap_render.build_library(colors, db_path=None, size=48, variants=3)
+    assert len(lib) == 9  # 3 colours x 3 variants for a diverse mosaic
+    # variants of a colour differ (shade jitter / different logos)
+    reds = [c for c in lib if abs(c.rgb[0] - 200) < 40 and c.rgb[1] < 90]
+    assert len({c.rgb for c in reds}) >= 2
 
 
 def test_render_produces_sized_canvas():

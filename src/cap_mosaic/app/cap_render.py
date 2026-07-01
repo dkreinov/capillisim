@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw
 
 from ..core.palette import RGB, ciede2000, rgb_to_lab
 from ..core.plan import GridPlan
-from .fake_caps import CapImage, fake_cap_library
+from .fake_caps import CapImage, fake_cap_library, render_fake_cap
 
 
 def _load_circular(path: str, size: int) -> Image.Image | None:
@@ -47,17 +47,33 @@ def _real_caps(db_path: str, size: int, mtime: float) -> tuple[CapImage, ...]:
     return tuple(caps)
 
 
+def _jitter(rgb: RGB, amount: int, seed: int) -> RGB:
+    """Small deterministic per-channel shade shift, so variants aren't identical."""
+    import random
+
+    rng = random.Random(seed)
+    return tuple(max(0, min(255, v + rng.randint(-amount, amount))) for v in rgb)
+
+
 def build_library(
     palette: list[RGB],
     db_path: str | None = None,
     size: int = 64,
     seed: int = 0,
     markings: bool = True,
+    variants: int = 3,
 ) -> list[CapImage]:
-    """A cap image library covering `palette` (fake caps) plus any real caps from
-    ``db_path`` (which the nearest-colour match will prefer when closer). The real
-    caps are loaded once and cached, so repeated renders (slider drags) are fast."""
-    lib = fake_cap_library(list(palette), size=size, seed=seed, markings=markings)
+    """A diverse cap library: several shade/logo variants per palette colour plus
+    the real caps from ``db_path``. Real caps are loaded once and cached. Variety
+    (different logos and slight shade shifts) makes the mosaic read like a jumble
+    of actual caps rather than flat discs."""
+    lib: list[CapImage] = []
+    for i, c in enumerate(palette):
+        c = tuple(int(v) for v in c)
+        for v in range(max(1, variants)):
+            jit = c if v == 0 else _jitter(c, 14, seed + i * 101 + v)
+            lib.append(render_fake_cap(jit, size=size, seed=seed + i * 7 + v * 3,
+                                       markings=markings))
     if db_path and Path(db_path).exists():
         lib.extend(_real_caps(db_path, size, Path(db_path).stat().st_mtime))
     return lib
@@ -68,8 +84,11 @@ def render_mosaic_caps(
     cap_lib: list[CapImage],
     px_per_cap: int = 24,
     background: RGB = (235, 235, 235),
+    variety: bool = True,
 ) -> Image.Image:
-    """Draw the plan by tiling the nearest-colour cap image into each cell."""
+    """Draw the plan by tiling caps into each cell. With `variety`, each cell picks
+    among the caps closest in colour (varying logos/shades), keyed by its position,
+    so equal-colour regions aren't a wall of identical tiles."""
     if not cap_lib:
         raise ValueError("cap_lib is empty")
     pitch = plan.cap_diameter_mm
@@ -79,17 +98,25 @@ def render_mosaic_caps(
     canvas = Image.new("RGB", (w, h), background)
 
     labs = [(cap, rgb_to_lab(cap.rgb)) for cap in cap_lib]
-    nearest: dict[RGB, CapImage] = {}
+    groups: dict[RGB, list[CapImage]] = {}
+
+    def candidates(key: RGB) -> list[CapImage]:
+        if key not in groups:
+            lab = rgb_to_lab(key)
+            ranked = sorted(((ciede2000(lab, l), cap) for cap, l in labs),
+                            key=lambda t: t[0])
+            best = ranked[0][0]
+            near = [cap for de, cap in ranked if de <= best + 6.0][:6]
+            groups[key] = near or [ranked[0][1]]
+        return groups[key]
+
     tiles: dict[int, Image.Image] = {}
     for cell in plan.cells:
         if cell.is_hole:
             continue
-        key = tuple(cell.rgb)
-        cap = nearest.get(key)
-        if cap is None:
-            lab = rgb_to_lab(key)
-            cap = min(labs, key=lambda cl: ciede2000(lab, cl[1]))[0]
-            nearest[key] = cap
+        group = candidates(tuple(cell.rgb))
+        idx = (cell.row * 31 + cell.col) % len(group) if variety else 0
+        cap = group[idx]
         tile = tiles.get(id(cap))
         if tile is None:
             tile = cap.image.resize((px_per_cap, px_per_cap), Image.LANCZOS)

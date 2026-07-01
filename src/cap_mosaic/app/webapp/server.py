@@ -29,7 +29,8 @@ _IMAGES: dict[str, Image.Image] = {}
 _COUNTER = {"n": 0}
 # Use the captured cap dataset for realistic caps + BOM when it exists.
 _DB = Path("dataset/caps.db")
-_MAX_CAPS_ACROSS = 48  # cap plan/render resolution so the UI stays responsive
+_MAX_CAPS_ACROSS = 140  # render resolution ceiling; bigger size -> more detail
+_SIM_WIDTH_PX = 1200  # target simulation width; tile px adapts to keep it bounded
 
 
 _STATIC = Path(__file__).parent / "static"
@@ -142,11 +143,14 @@ def simulate(
     size_mm: float | None = Query(None),
     distance_m: float | None = Query(None),
     colors: int = 12,
-    px_per_cap: int = 22,
 ) -> Response:
     img = _get(image_id)
     res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
     plan = _plan(image_id, img, res["caps_across"], colors)
+    # adapt tile pixels to how many caps there are, so a bigger piece shows more
+    # detail while the output stays a bounded size.
+    capped_across = max(1, min(res["caps_across"], _MAX_CAPS_ACROSS))
+    px_per_cap = max(6, min(22, _SIM_WIDTH_PX // capped_across))
     palette = list({tuple(c.rgb) for c in plan.cells if not c.is_hole})
     lib = build_library(palette, db_path=str(_DB) if _DB.exists() else None, size=64)
     mosaic = render_mosaic_caps(plan, lib, px_per_cap=px_per_cap)
