@@ -65,20 +65,42 @@ def _get(image_id: str) -> Image.Image:
     return img
 
 
-def _solve(img: Image.Image, mode: str, pitch: float,
+# Caches keyed by image id: the legibility floor (image+mode only) and the plan
+# (image+caps+colors). Both are size/distance-independent, so slider drags reuse
+# them instead of recomputing k-means and SSIM every request.
+_FLOORS: dict[tuple, int] = {}
+_PLANS: dict[tuple, object] = {}
+
+
+def _floor(image_id: str, img: Image.Image, mode: str) -> int:
+    key = (image_id, mode)
+    if key not in _FLOORS:
+        _FLOORS[key] = estimator.min_caps_across(
+            np.asarray(img), mode=mode, aspect=img.width / img.height
+        )
+    return _FLOORS[key]
+
+
+def _plan(image_id: str, img: Image.Image, caps_across: int, colors: int):
+    caps_across = max(1, min(caps_across, _MAX_CAPS_ACROSS))
+    key = (image_id, caps_across, colors)
+    if key not in _PLANS:
+        grid = grid_for_caps_across(caps_across, img.width / img.height, Cap())
+        _PLANS[key] = plan_from_image(img, grid, colors=colors)
+    return _PLANS[key]
+
+
+def _solve(img: Image.Image, image_id: str, mode: str, pitch: float,
            size_mm: float | None, distance_m: float | None) -> dict:
     arr = np.asarray(img)
+    floor = _floor(image_id, img, mode)
     if size_mm is not None:
-        return estimator.solve_from_size(arr, size_mm, mode=mode, pitch_mm=pitch)
+        return estimator.solve_from_size(arr, size_mm, mode=mode, pitch_mm=pitch,
+                                         min_caps=floor)
     if distance_m is not None:
-        return estimator.solve_from_distance(arr, distance_m, mode=mode, pitch_mm=pitch)
+        return estimator.solve_from_distance(arr, distance_m, mode=mode,
+                                             pitch_mm=pitch, min_caps=floor)
     raise HTTPException(400, "provide either size_mm or distance_m")
-
-
-def _plan_for(img: Image.Image, caps_across: int, colors: int):
-    caps_across = max(1, min(caps_across, _MAX_CAPS_ACROSS))
-    grid = grid_for_caps_across(caps_across, img.width / img.height, Cap())
-    return plan_from_image(img, grid, colors=colors)
 
 
 @app.get("/estimate")
@@ -90,21 +112,25 @@ def estimate(
     distance_m: float | None = Query(None),
     colors: int = 12,
 ) -> dict:
+    """Solve one axis from the other in a single call. When both size_mm and
+    distance_m are given, size drives the geometry and distance drives the
+    read-quality + effective-colour readout."""
     img = _get(image_id)
-    res = _solve(img, mode, pitch_mm, size_mm, distance_m)
+    primary_size = size_mm if size_mm is not None else None
+    res = _solve(img, image_id, mode, pitch_mm, primary_size, distance_m)
 
-    plan = _plan_for(img, res["caps_across"], colors)
-    counts = Counter(
-        tuple(c.rgb) for c in plan.cells if not c.is_hole
-    )
-    bom = {"#%02x%02x%02x" % rgb: n for rgb, n in counts.most_common()}
+    if size_mm is not None and distance_m is not None:
+        res["distance_m"] = round(distance_m, 2)
+        res["read_quality"] = estimator.read_quality(pitch_mm, distance_m)
+
+    plan = _plan(image_id, img, res["caps_across"], colors)
+    counts = Counter(tuple(c.rgb) for c in plan.cells if not c.is_hole)
     palette = list(counts.keys())
     view_d = res.get("distance_m") or res.get("recommended_distance_m") or 5.0
-    effective = estimator.effective_colors(palette, view_d, pitch_mm)
 
-    res["bom"] = bom
+    res["bom"] = {"#%02x%02x%02x" % rgb: n for rgb, n in counts.most_common()}
     res["colors_used"] = len(palette)
-    res["effective_colors"] = len(effective)
+    res["effective_colors"] = len(estimator.effective_colors(palette, view_d, pitch_mm))
     return res
 
 
@@ -119,8 +145,8 @@ def simulate(
     px_per_cap: int = 22,
 ) -> Response:
     img = _get(image_id)
-    res = _solve(img, mode, pitch_mm, size_mm, distance_m)
-    plan = _plan_for(img, res["caps_across"], colors)
+    res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
+    plan = _plan(image_id, img, res["caps_across"], colors)
     palette = list({tuple(c.rgb) for c in plan.cells if not c.is_hole})
     lib = build_library(palette, db_path=str(_DB) if _DB.exists() else None, size=64)
     mosaic = render_mosaic_caps(plan, lib, px_per_cap=px_per_cap)

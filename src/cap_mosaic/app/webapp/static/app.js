@@ -71,7 +71,7 @@ async function estimate(params) {
 
 async function refresh() {
   if (!imageId) return;
-  const b = await estimate({ size_mm: sizeMm() });
+  const b = await estimate({ size_mm: sizeMm(), distance_m: distM() });
   if (!b) return;
 
   $("across").textContent = b.caps_across;
@@ -79,8 +79,7 @@ async function refresh() {
   $("floor").textContent = b.min_caps_across;
   $("mindist").textContent = b.min_distance_m + " m";
   $("quality").textContent = readQuality(distM());
-  $("colours").textContent = `${b.colors_used} / ` +
-    (await estimate({ distance_m: distM() }).then((e) => e ? e.effective_colors : b.effective_colors));
+  $("colours").textContent = `${b.colors_used} / ${b.effective_colors}`;
 
   const warn = $("warning");
   if (b.warning || !b.legible) {

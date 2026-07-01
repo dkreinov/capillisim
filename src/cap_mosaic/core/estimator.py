@@ -53,14 +53,18 @@ def solve_from_size(
     mode: str = "picture",
     pitch_mm: float = 32.0,
     fov_deg: float = DEFAULT_FOV_DEG,
+    min_caps: int | None = None,
 ) -> dict:
-    """Given a physical width, report caps, legibility, and viewing distances."""
+    """Given a physical width, report caps, legibility, and viewing distances.
+
+    Pass ``min_caps`` to reuse a precomputed legibility floor (it depends only on
+    the image + mode, so callers can cache it across sizes)."""
     a = np.asarray(image_rgb)
     h, w = a.shape[:2]
     aspect = w / h
     cap = Cap(pitch_mm)
     caps_across = int(width_mm // pitch_mm)
-    floor = min_caps_across(a, mode=mode, aspect=aspect)
+    floor = min_caps if min_caps is not None else min_caps_across(a, mode=mode, aspect=aspect)
     legible = caps_across >= floor
     height_mm = width_mm / aspect
     total = estimate_count(width_mm, height_mm, cap)
@@ -93,11 +97,13 @@ def solve_from_distance(
     mode: str = "picture",
     pitch_mm: float = 32.0,
     fov_deg: float = DEFAULT_FOV_DEG,
+    min_caps: int | None = None,
 ) -> dict:
     """Given a viewing distance, report the size that fills the view and its caps."""
     width_mm = 2.0 * distance_m * math.tan(math.radians(fov_deg / 2.0)) * 1000.0
     res = solve_from_size(
-        image_rgb, width_mm, mode=mode, pitch_mm=pitch_mm, fov_deg=fov_deg
+        image_rgb, width_mm, mode=mode, pitch_mm=pitch_mm, fov_deg=fov_deg,
+        min_caps=min_caps,
     )
     res["distance_m"] = round(distance_m, 2)
     res["read_quality"] = read_quality(pitch_mm, distance_m)

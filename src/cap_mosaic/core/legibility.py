@@ -38,18 +38,18 @@ def _resize_nearest(a: np.ndarray, nh: int, nw: int) -> np.ndarray:
 
 
 def _downsample_mean(gray: np.ndarray, nx: int, ny: int) -> np.ndarray:
-    """Area-average `gray` down to ny x nx bins (handles non-divisible sizes)."""
+    """Area-average `gray` down to ny x nx bins (vectorised, via an integral image)."""
     h, w = gray.shape
     nx = max(1, min(nx, w))
     ny = max(1, min(ny, h))
     xe = np.linspace(0, w, nx + 1).astype(int)
     ye = np.linspace(0, h, ny + 1).astype(int)
-    out = np.empty((ny, nx))
-    for j in range(ny):
-        rows = gray[ye[j]:ye[j + 1]]
-        for i in range(nx):
-            out[j, i] = rows[:, xe[i]:xe[i + 1]].mean()
-    return out
+    cs = np.zeros((h + 1, w + 1))
+    cs[1:, 1:] = gray.cumsum(0).cumsum(1)
+    y0, y1, x0, x1 = ye[:-1], ye[1:], xe[:-1], xe[1:]
+    block = cs[y1][:, x1] - cs[y0][:, x1] - cs[y1][:, x0] + cs[y0][:, x0]
+    counts = (y1 - y0)[:, None] * (x1 - x0)[None, :]
+    return block / counts
 
 
 def _box_mean(a: np.ndarray, k: int) -> np.ndarray:
@@ -77,18 +77,26 @@ def _ssim(a: np.ndarray, b: np.ndarray, k: int = 7) -> float:
     return float(np.clip(s, -1.0, 1.0).mean())
 
 
-def legibility_score(rgb: np.ndarray, caps_across: int, aspect: float) -> float:
-    """Structural similarity of the image rendered at `caps_across` vs the original."""
+def _prep(rgb: np.ndarray) -> np.ndarray:
+    """Grayscale, downscaled once to the working resolution."""
     gray = _to_gray(rgb)
     h, w = gray.shape
     if max(h, w) > _WORK:
         scale = _WORK / max(h, w)
         gray = _resize_nearest(gray, max(1, round(h * scale)), max(1, round(w * scale)))
-        h, w = gray.shape
+    return gray
+
+
+def _score_gray(gray: np.ndarray, caps_across: int, aspect: float) -> float:
+    h, w = gray.shape
     ny = max(1, round(caps_across / aspect))
-    small = _downsample_mean(gray, caps_across, ny)
-    up = _resize_nearest(small, h, w)
+    up = _resize_nearest(_downsample_mean(gray, caps_across, ny), h, w)
     return _ssim(gray, up)
+
+
+def legibility_score(rgb: np.ndarray, caps_across: int, aspect: float) -> float:
+    """Structural similarity of the image rendered at `caps_across` vs the original."""
+    return _score_gray(_prep(rgb), caps_across, aspect)
 
 
 def min_caps_across(
@@ -106,7 +114,8 @@ def min_caps_across(
         aspect = w / h
     if threshold is None:
         threshold = PATTERN_THRESHOLD if mode == "pattern" else PICTURE_THRESHOLD
+    gray = _prep(a)  # prep once, then score every candidate
     for n in candidates:
-        if legibility_score(a, n, aspect) >= threshold:
+        if _score_gray(gray, n, aspect) >= threshold:
             return n
     return candidates[-1]
