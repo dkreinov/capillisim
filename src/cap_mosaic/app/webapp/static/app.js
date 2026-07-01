@@ -29,6 +29,18 @@ $("fileInput").addEventListener("change", (e) => { if (e.target.files[0]) upload
   dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove("hot"); }));
 dz.addEventListener("drop", (e) => { if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); });
 
+// paste an image from the clipboard (Ctrl/Cmd+V) anywhere on the page
+document.addEventListener("paste", (e) => {
+  const items = (e.clipboardData || window.clipboardData)?.items || [];
+  for (const it of items) {
+    if (it.type && it.type.startsWith("image/")) {
+      const blob = it.getAsFile();
+      if (blob) { e.preventDefault(); upload(blob); }
+      return;
+    }
+  }
+});
+
 async function upload(file) {
   const fd = new FormData();
   fd.append("file", file);
