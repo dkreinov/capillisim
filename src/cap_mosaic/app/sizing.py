@@ -23,32 +23,14 @@ piece fills a comfortable field of view.
 from __future__ import annotations
 
 import argparse
-import math
 
-ARCMIN_PER_RAD = 60.0 * 180.0 / math.pi  # 3437.75
-
-# Cap subtends ~this many arc-minutes -> the mosaic reads as a coherent picture.
-READS_ARCMIN = 25.0
-# Cap subtends ~this many arc-minutes -> tiles are essentially smooth/indistinct.
-SMOOTH_ARCMIN = 3.0
-
-
-def image_width_m(mount_height_m: float, throw_ratio: float) -> float:
-    """Projected image width for a fixed-throw projector at a given height."""
-    return mount_height_m / throw_ratio
-
-
-def angular_arcmin(size_m: float, distance_m: float) -> float:
-    return (size_m / distance_m) * ARCMIN_PER_RAD
-
-
-def distance_for_arcmin(size_m: float, arcmin: float) -> float:
-    return size_m / (arcmin / ARCMIN_PER_RAD)
-
-
-def fov_distance(width_m: float, horizontal_fov_deg: float) -> float:
-    """Distance at which `width_m` fills the given horizontal field of view."""
-    return (width_m / 2.0) / math.tan(math.radians(horizontal_fov_deg / 2.0))
+from ..core.sizing import (
+    READS_ARCMIN,
+    SMOOTH_ARCMIN,
+    distance_for_arcmin,
+    fov_distance,
+    image_width_m,
+)
 
 
 def report(
