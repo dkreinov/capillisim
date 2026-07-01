@@ -105,3 +105,7 @@ PYTHONPATH=src python -m cap_mosaic.app.cli design --image yourpic.jpg \
 
 The `--preview-dir` distance images show exactly how your subject will read as it
 blends — check them before committing to a cap count.
+
+For an interactive version of all this — drag an image and slide size vs. viewing
+distance with a live caps-vs-picture simulation and a per-colour cap count — see
+the **Mosaic Estimator** web app (`docs/ESTIMATOR.md`).

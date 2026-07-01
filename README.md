@@ -45,6 +45,7 @@ this project. Details in `docs/PRIOR_ART.md`.
 - `docs/POC_OPERATION.md` — how projector + phone + PC connect and run the loop.
 - `docs/CALIBRATION.md` — the projector→table calibration procedure (step by step).
 - `docs/SIZING_AND_VIEWING.md` — piece size, cap count, and viewing distance.
+- `docs/ESTIMATOR.md` — the web app: drag an image, trade off size ↔ distance, see the caps-vs-picture simulation and per-colour BOM.
 - `docs/COLOR_MATCHING.md` — perceptual ΔE matching and the place-or-leave-empty threshold: research, anchors, calibration plan.
 - `docs/DATA_MODEL.md` — the SQLite cap dataset/inventory schema (caps + crops + quality + busy-ness + future embeddings).
 - `docs/HARDWARE.md` — the physical rig and the specs we still need.
