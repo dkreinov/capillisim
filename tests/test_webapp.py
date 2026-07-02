@@ -168,6 +168,18 @@ def test_simulate_accepts_board_colour_and_real_only():
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
 
 
+def test_target_is_frame_sized_and_differs_from_simulate():
+    from cap_mosaic.app.webapp.server import _FRAME_PX
+
+    iid = _upload()
+    p = {"image_id": iid, "size_mm": 2500, "distance_m": 6.0}
+    tgt = client.get("/target", params=p)
+    sim = client.get("/simulate", params=p)
+    assert tgt.status_code == 200 and tgt.headers["content-type"] == "image/png"
+    assert Image.open(io.BytesIO(tgt.content)).size == _FRAME_PX  # same framing
+    assert tgt.content != sim.content                              # original != caps
+
+
 def test_simulate_dither_changes_output():
     iid = _upload()
     off = client.get("/simulate", params={"image_id": iid, "size_mm": 2000, "dither": False}).content

@@ -31,8 +31,12 @@ main { display:grid; grid-template-columns:340px 1fr; gap:20px; padding:18px 26p
 
 .right { min-width:0; }
 .warning { background:var(--warn); color:#ffdfe4; padding:10px 14px; border-radius:10px; margin-bottom:12px; }
-.simwrap { background:var(--panel); border-radius:14px; padding:12px; }
+.simwrap { position:relative; background:var(--panel); border-radius:14px; padding:12px; }
 #sim { width:100%; border-radius:9px; display:block; background:#0d0f14; image-rendering:auto; min-height:120px; }
+.compare { position:absolute; top:20px; right:20px; padding:5px 10px; font-size:12px; cursor:pointer;
+  background:#1c2230cc; color:#dfe6f2; border:1px solid #39445a; border-radius:8px; user-select:none; }
+.compare:hover { background:#263048; }
+.compare:active { background:#2f4d6b; border-color:#6cf; }
 .simhint { color:var(--mut); font-size:13px; margin-top:8px; text-align:center; }
 
 .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px; }

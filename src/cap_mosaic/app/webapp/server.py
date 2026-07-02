@@ -257,5 +257,31 @@ def simulate(
     return Response(content=buf.getvalue(), media_type="image/png")
 
 
+@app.get("/target")
+def target(
+    image_id: str,
+    mode: str = "picture",
+    pitch_mm: float = 32.0,
+    size_mm: float | None = Query(None),
+    distance_m: float | None = Query(None),
+) -> Response:
+    """The ORIGINAL image framed exactly like /simulate (same size/distance/frame),
+    so hold-to-compare shows the target vs the cap rendering apples-to-apples."""
+    img = _get(image_id).convert("RGB")
+    res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
+    if distance_m is not None:
+        out = view_at_distance(img, res["width_mm"], distance_m, _FRAME_PX)
+    else:  # no distance -> match the sharp mosaic's canvas size
+        capped = max(1, min(res["caps_across"], _MAX_CAPS_ACROSS))
+        px_per_cap = max(6, min(22, _SIM_WIDTH_PX // capped))
+        grid = grid_for_caps_across(capped, img.width / img.height, Cap())
+        ppm = px_per_cap / pitch_mm
+        out = img.resize((max(1, round(grid.width_mm * ppm)),
+                          max(1, round(grid.height_mm * ppm))), Image.LANCZOS)
+    buf = io.BytesIO()
+    out.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
 # Mounted last so the API routes above take precedence.
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")

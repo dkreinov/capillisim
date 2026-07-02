@@ -9,6 +9,7 @@ let originalAspect = 1;
 let aspect = 1;
 let selFrac = null;  // {x0,y0,x1,y1} in image fractions
 let highlight = null;  // BOM colour being isolated (hex), or null
+let curSimSrc = null, curTargetSrc = null;  // for hold-to-compare
 
 function mode() {
   return document.querySelector('input[name=mode]:checked').value;
@@ -86,6 +87,15 @@ $("preset").addEventListener("change", refresh);
 $("thicken").addEventListener("change", refresh);
 $("realOnly").addEventListener("change", refresh);
 $("dither").addEventListener("change", refresh);
+
+// hold the compare button to swap the cap sim for the original (same framing)
+const _cmp = $("compareBtn");
+const _showTarget = () => { if (curTargetSrc) $("sim").src = curTargetSrc; };
+const _showSim = () => { if (curSimSrc) $("sim").src = curSimSrc; };
+_cmp.addEventListener("mousedown", _showTarget);
+["mouseup", "mouseleave"].forEach((e) => _cmp.addEventListener(e, _showSim));
+_cmp.addEventListener("touchstart", (e) => { e.preventDefault(); _showTarget(); });
+_cmp.addEventListener("touchend", _showSim);
 $("bgColor").addEventListener("input", debounced);
 
 // --- region crop: drag a rectangle on the original image ---
@@ -208,7 +218,10 @@ async function refresh() {
   // simulation
   const q = new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, size_mm: sizeMm(), distance_m: distM(), ...extraParams() });
   if (highlight) q.set("highlight", highlight);
-  $("sim").src = "/simulate?" + q.toString() + "&_=" + Date.now();
+  curSimSrc = "/simulate?" + q.toString() + "&_=" + Date.now();
+  $("sim").src = curSimSrc;
+  const tq = new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, size_mm: sizeMm(), distance_m: distM() });
+  curTargetSrc = "/target?" + tq.toString() + "&_=" + Date.now();
   const pct = b.apparent_pct != null ? `fills ~${b.apparent_pct}% of your view` : "";
   $("simhint").textContent =
     `${(sizeMm() / 1000).toFixed(2)} m wide, seen from ${distM().toFixed(1)} m — ${pct} · ${readQuality(distM())}`;
