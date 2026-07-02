@@ -55,6 +55,18 @@ def test_minority_glare_is_excluded():
     assert abs(a[0] - b[0]) <= 6, (a, b)  # streak dropped, colour stable
 
 
+def test_card_crop_with_small_cap_ignores_the_white_surround():
+    # real crops are CARD-circle crops: the cap is a smaller disc inside them,
+    # surrounded by white card. A dark cap must NOT read light-gray.
+    n = 128
+    img = np.full((n, n, 3), 250, np.uint8)
+    yy, xx = np.mgrid[0:n, 0:n]
+    cap = np.hypot(xx - n * 0.45, yy - n * 0.52) <= n * 0.30  # off-centre, small
+    img[cap] = (18, 15, 12)
+    out = mosaic_rgb_from_crop(img)
+    assert out[0] < 60, out  # dark cap stays dark; white card excluded
+
+
 def test_median_rgb_is_per_channel_and_robust():
     colors = [(10, 20, 30), (12, 22, 32), (200, 200, 200)]  # one bad frame
     assert median_rgb(colors) == (12, 22, 32)

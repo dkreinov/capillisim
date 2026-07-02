@@ -31,17 +31,40 @@ def _linear_to_srgb(a: np.ndarray) -> np.ndarray:
 def mosaic_rgb_from_crop(
     crop_rgb: np.ndarray, disc_frac: float = 0.94, glare_level: int = GLARE_LEVEL
 ) -> RGB:
-    """Linear-light mean colour of the cap disc in a square crop (RGB array).
+    """Linear-light mean colour of the cap face in a crop (RGB array).
 
-    Masks to the centre disc (``disc_frac`` of the half-width, skipping the card
-    background at the corners), drops minority glare pixels, then averages in
-    linear light. A mostly-bright cap (white/silver) keeps its pixels — masking
-    a majority would leave only its shadows.
+    Card crops include white card AROUND the cap, so first locate the actual cap
+    disc (``cap_crop.detect_cap_circle``); fall back to the centre disc
+    (``disc_frac`` of the half-width) when detection fails. Minority glare
+    pixels are dropped, then the face is averaged in linear light. A
+    mostly-bright cap (white/silver) keeps its pixels — masking a majority
+    would leave only its shadows.
     """
+    import cv2
+
+    from .cap_crop import detect_cap_circle
+
     a = np.asarray(crop_rgb, dtype=np.uint8)
     h, w = a.shape[:2]
+    found = detect_cap_circle(cv2.cvtColor(a, cv2.COLOR_RGB2BGR))
+    if found is not None:
+        cx, cy, r = found
+    else:
+        cx, cy, r = w / 2.0, h / 2.0, (min(h, w) / 2.0) * disc_frac
     yy, xx = np.mgrid[0:h, 0:w]
-    disc = np.hypot(xx - w / 2.0, yy - h / 2.0) <= (min(h, w) / 2.0) * disc_frac
+    dist = np.hypot(xx - cx, yy - cy)
+    # Hough often locks onto the card's PRINTED circle instead of the cap edge,
+    # leaving a white ring inside the mask. Shrink-wrap: walk the radius inward
+    # until the boundary ring stops being card-white, i.e. we're on the cap.
+    r_use = r * 0.45
+    for f in np.arange(0.92, 0.45, -0.04):
+        band = (dist >= r * f - 2.0) & (dist <= r * f)
+        ring = a[band].reshape(-1, 3)
+        if len(ring) and np.all(ring >= 230, axis=1).mean() < 0.3:
+            # found the cap edge; step further in to clear the rim/edge halo
+            r_use = r * max(0.45, f - 0.08)
+            break
+    disc = dist <= max(4.0, r_use)
     px = a[disc].reshape(-1, 3)
     if px.size == 0:
         px = a.reshape(-1, 3)
