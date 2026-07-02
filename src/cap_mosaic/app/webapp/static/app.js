@@ -4,7 +4,10 @@ const PITCH = 32; // mm
 const ARCMIN = 3437.75;
 
 let imageId = null;
+let originalId = null;
+let originalAspect = 1;
 let aspect = 1;
+let selFrac = null;  // {x0,y0,x1,y1} in image fractions
 
 function mode() {
   return document.querySelector('input[name=mode]:checked').value;
@@ -13,10 +16,13 @@ function sizeMm() { return Number($("size").value); }
 function distM() { return Number($("dist").value); }
 function preset() { return $("preset").value; }
 function thicken() { return $("thicken").checked; }
+function bgColor() { return $("bgColor").value; }
+function realOnly() { return $("realOnly").checked; }
 function extraParams() {
-  const p = {};
+  const p = { bg_color: bgColor() };
   if (preset()) p.preset = preset();
   if (thicken()) p.thicken = true;
+  if (realOnly()) p.real_only = true;
   return p;
 }
 
@@ -55,17 +61,20 @@ async function upload(file) {
   const r = await fetch("/upload", { method: "POST", body: fd });
   if (!r.ok) { alert("upload failed"); return; }
   const b = await r.json();
-  imageId = b.id;
-  aspect = b.aspect;
+  imageId = originalId = b.id;
+  aspect = originalAspect = b.aspect;
   dz.querySelector("p").innerHTML = `loaded ${b.width}×${b.height}<br/><small>drop another to replace</small>`;
-  const orig = $("orig");
-  orig.src = URL.createObjectURL(file);
-  orig.hidden = false;
+  setPreview(b.id);
+  clearSelection();
+  $("origwrap").hidden = false;
+  $("croptools").hidden = false;
   $("controls").hidden = false;
   $("stats").hidden = false;
   $("bomwrap").hidden = false;
   refresh();
 }
+
+function setPreview(id) { $("orig").src = "/image?image_id=" + id + "&_=" + Date.now(); }
 
 // --- controls ---
 $("size").addEventListener("input", () => { $("sizeVal").textContent = (sizeMm() / 1000).toFixed(2) + " m"; debounced(); });
@@ -73,6 +82,62 @@ $("dist").addEventListener("input", () => { $("distVal").textContent = distM().t
 document.querySelectorAll('input[name=mode]').forEach((r) => r.addEventListener("change", refresh));
 $("preset").addEventListener("change", refresh);
 $("thicken").addEventListener("change", refresh);
+$("realOnly").addEventListener("change", refresh);
+$("bgColor").addEventListener("input", debounced);
+
+// --- region crop: drag a rectangle on the original image ---
+const origImg = $("orig");
+const selBox = $("sel");
+let drag = null;
+
+function clearSelection() {
+  selFrac = null; drag = null;
+  selBox.hidden = true;
+  $("cropBtn").disabled = true;
+}
+
+function imgRect() { return origImg.getBoundingClientRect(); }
+
+origImg.addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  const r = imgRect();
+  drag = { x: e.clientX - r.left, y: e.clientY - r.top };
+});
+window.addEventListener("mousemove", (e) => {
+  if (!drag) return;
+  const r = imgRect();
+  const cx = Math.max(0, Math.min(r.width, e.clientX - r.left));
+  const cy = Math.max(0, Math.min(r.height, e.clientY - r.top));
+  const x = Math.min(drag.x, cx), y = Math.min(drag.y, cy);
+  const w = Math.abs(cx - drag.x), h = Math.abs(cy - drag.y);
+  Object.assign(selBox.style, { left: x + "px", top: y + "px", width: w + "px", height: h + "px" });
+  selBox.hidden = false;
+  selFrac = { x0: x / r.width, y0: y / r.height, x1: (x + w) / r.width, y1: (y + h) / r.height };
+});
+window.addEventListener("mouseup", () => {
+  if (!drag) return;
+  drag = null;
+  const ok = selFrac && (selFrac.x1 - selFrac.x0) > 0.02 && (selFrac.y1 - selFrac.y0) > 0.02;
+  $("cropBtn").disabled = !ok;
+  if (!ok) clearSelection();
+});
+
+$("cropBtn").addEventListener("click", async () => {
+  if (!selFrac || !imageId) return;
+  const q = new URLSearchParams({ image_id: imageId, ...selFrac });
+  const r = await fetch("/crop?" + q.toString());
+  if (!r.ok) { alert("crop failed"); return; }
+  const b = await r.json();
+  imageId = b.id; aspect = b.aspect;
+  setPreview(b.id); clearSelection();
+  refresh();
+});
+
+$("resetImg").addEventListener("click", () => {
+  imageId = originalId; aspect = originalAspect;
+  setPreview(originalId); clearSelection();
+  refresh();
+});
 
 $("fitSize").addEventListener("click", async () => {
   const b = await estimate({ distance_m: distM() });

@@ -62,11 +62,48 @@ async def upload(file: UploadFile = File(...)) -> dict:
             "aspect": img.width / img.height}
 
 
+def _hex_rgb(s: str, default: tuple[int, int, int]) -> tuple[int, int, int]:
+    """Parse '#rrggbb' (or 'rrggbb') to an RGB tuple; fall back to `default`."""
+    s = (s or "").strip().lstrip("#")
+    if len(s) == 6:
+        try:
+            return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
+        except ValueError:
+            pass
+    return default
+
+
 def _get(image_id: str) -> Image.Image:
     img = _IMAGES.get(image_id)
     if img is None:
         raise HTTPException(404, "unknown image id (upload first)")
     return img
+
+
+@app.get("/image")
+def image(image_id: str) -> Response:
+    """The stored image as PNG (used to preview a cropped region)."""
+    buf = io.BytesIO()
+    _get(image_id).save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
+@app.get("/crop")
+def crop(image_id: str, x0: float, y0: float, x1: float, y1: float) -> dict:
+    """Crop a stored image to a fractional box (0..1) and store it as a new id."""
+    img = _get(image_id)
+    x0, x1 = sorted((max(0.0, min(1.0, x0)), max(0.0, min(1.0, x1))))
+    y0, y1 = sorted((max(0.0, min(1.0, y0)), max(0.0, min(1.0, y1))))
+    box = (int(x0 * img.width), int(y0 * img.height),
+           int(x1 * img.width), int(y1 * img.height))
+    if box[2] - box[0] < 4 or box[3] - box[1] < 4:
+        raise HTTPException(400, "selection too small")
+    sub = img.crop(box)
+    _COUNTER["n"] += 1
+    iid = str(_COUNTER["n"])
+    _IMAGES[iid] = sub
+    return {"id": iid, "width": sub.width, "height": sub.height,
+            "aspect": sub.width / sub.height}
 
 
 # Caches keyed by image id: the legibility floor (image+mode only) and the plan
@@ -182,8 +219,10 @@ def simulate(
     colors: int = 12,
     bare_white: bool = True,
     real_caps: bool = True,
+    real_only: bool = False,
     preset: str | None = None,
     thicken: bool = False,
+    bg_color: str = "#3c2d23",
 ) -> Response:
     img = _get(image_id)
     res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
@@ -197,9 +236,13 @@ def simulate(
     # Real caps are auto-cropped to their disc (see cap_crop) so every cap is the
     # same size; blend them in for photographic realism. Set real_caps=false for
     # clean procedural caps only.
-    db = str(_DB) if (real_caps and _DB.exists()) else None
+    db = str(_DB) if ((real_caps or real_only) and _DB.exists()) else None
     lib = build_library(palette, db_path=db, size=64)
-    mosaic = render_mosaic_caps(plan, lib, px_per_cap=px_per_cap)
+    # The gaps between round glued caps and the holes show the physical backing
+    # board — one solid colour the user controls (wood/paper/paint), not the cap.
+    board = _hex_rgb(bg_color, (60, 45, 35))
+    mosaic = render_mosaic_caps(plan, lib, px_per_cap=px_per_cap, background=board,
+                                real_only=real_only)
     if distance_m is not None:
         # Shrink the sharp mosaic into a fixed FOV frame; caps merge via the
         # linear-light resample rather than a growing blur.

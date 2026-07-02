@@ -142,6 +142,32 @@ def test_simulate_is_fast_when_warm():
     assert dt_ms < 300
 
 
+def test_crop_creates_a_smaller_image_and_image_endpoint_serves_it():
+    iid = _upload()
+    before = client.get("/image", params={"image_id": iid})
+    assert before.status_code == 200 and before.headers["content-type"] == "image/png"
+    w0 = Image.open(io.BytesIO(before.content)).width
+    r = client.get("/crop", params={"image_id": iid, "x0": 0.25, "y0": 0.25, "x1": 0.75, "y1": 0.75})
+    assert r.status_code == 200
+    b = r.json()
+    assert b["id"] != iid
+    cropped = Image.open(io.BytesIO(client.get("/image", params={"image_id": b["id"]}).content))
+    assert cropped.width < w0  # region is a subset of the original
+
+
+def test_crop_rejects_tiny_selection():
+    iid = _upload()
+    r = client.get("/crop", params={"image_id": iid, "x0": 0.5, "y0": 0.5, "x1": 0.501, "y1": 0.501})
+    assert r.status_code == 400
+
+
+def test_simulate_accepts_board_colour_and_real_only():
+    iid = _upload()
+    r = client.get("/simulate", params={"image_id": iid, "distance_m": 6.0,
+                                        "bg_color": "#101820", "real_only": True})
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+
+
 def test_unknown_image_id_404():
     r = client.get("/estimate", params={"image_id": "nope", "size_mm": 1000})
     assert r.status_code == 404

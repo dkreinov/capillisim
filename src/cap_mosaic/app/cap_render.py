@@ -45,7 +45,7 @@ def _real_caps(db_path: str, size: int, mtime: float) -> tuple[CapImage, ...]:
                 continue
             im = _load_circular(c.frames[0].path, size)
             if im is not None:
-                caps.append(CapImage(tuple(c.rgb), im))
+                caps.append(CapImage(tuple(c.rgb), im, real=True))
     return tuple(caps)
 
 
@@ -85,28 +85,32 @@ def render_mosaic_caps(
     plan: GridPlan,
     cap_lib: list[CapImage],
     px_per_cap: int = 24,
-    background: RGB = (235, 235, 235),
+    background: RGB = (60, 45, 35),
     variety: bool = True,
-    glued: bool = True,
+    real_only: bool = False,
 ) -> Image.Image:
-    """Draw the plan by tiling caps into each cell. With `variety`, each cell picks
-    among the caps closest in colour (varying logos/shades), keyed by its position,
-    so equal-colour regions aren't a wall of identical tiles.
+    """Draw the plan by tiling round caps into each cell. With `variety`, each cell
+    picks among the caps closest in colour (varying logos/shades), keyed by its
+    position, so equal-colour regions aren't a wall of identical tiles.
 
-    Caps are assumed glued edge-to-edge, so `glued=True` fills each cell with its
-    cap colour before pasting the round cap — no board shows between caps. Holes
-    are the only place the background shows (a deliberate empty cell, uncounted).
+    Caps are round, so the small gaps between glued caps show the physical
+    **backing board** — one solid `background` colour (wood / paper / paint), not
+    the cap colour. Holes show the same board (a deliberate empty cell, uncounted).
+    With `real_only`, cells are filled only from photographed caps when the library
+    has any.
     """
     if not cap_lib:
         raise ValueError("cap_lib is empty")
+    pool = [c for c in cap_lib if getattr(c, "real", False)] if real_only else []
+    if not pool:
+        pool = cap_lib
     pitch = plan.cap_diameter_mm
     ppm = px_per_cap / pitch
     w = max(1, round(plan.width_mm * ppm))
     h = max(1, round(plan.height_mm * ppm))
-    canvas = Image.new("RGB", (w, h), background)
-    filler = ImageDraw.Draw(canvas)
+    canvas = Image.new("RGB", (w, h), tuple(background))
 
-    labs = [(cap, rgb_to_lab(cap.rgb)) for cap in cap_lib]
+    labs = [(cap, rgb_to_lab(cap.rgb)) for cap in pool]
     groups: dict[RGB, list[CapImage]] = {}
 
     def candidates(key: RGB) -> list[CapImage]:
@@ -132,10 +136,5 @@ def render_mosaic_caps(
             tile = cap.image.resize((px_per_cap, px_per_cap), Image.LANCZOS)
             tiles[id(cap)] = tile
         cx, cy = cell.x_mm * ppm, cell.y_mm * ppm
-        x, y = round(cx - half), round(cy - half)
-        if glued:
-            # fill the whole cell with the cap colour so the round cap leaves no
-            # board gap at the corners — caps read as glued edge-to-edge.
-            filler.rectangle([x, y, x + px_per_cap, y + px_per_cap], fill=tuple(cell.rgb))
-        canvas.paste(tile, (x, y), tile)
+        canvas.paste(tile, (round(cx - half), round(cy - half)), tile)
     return canvas

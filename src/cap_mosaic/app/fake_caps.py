@@ -24,6 +24,7 @@ _LETTERS = "ABCDEFGHKMNPRSTVXZ"
 class CapImage:
     rgb: RGB
     image: Image.Image  # RGBA, square, a circular cap on a transparent field
+    real: bool = False  # True for photographed caps, False for procedural ones
 
 
 def _font(size: int) -> ImageFont.ImageFont:

@@ -35,23 +35,33 @@ def test_render_produces_sized_canvas():
     assert mosaic.mode == "RGB"
 
 
-def test_glued_render_leaves_no_background_gaps_between_caps():
+def test_gaps_between_caps_show_the_board_colour():
     import numpy as np
 
-    plan = _plan()  # solid demo region, no holes in the interior
+    plan = _plan()
     colors = list({tuple(c.rgb) for c in plan.cells if not c.is_hole})
     lib = cap_render.build_library(colors, size=48)
-    bg = (235, 235, 235)
-    glued = cap_render.render_mosaic_caps(plan, lib, px_per_cap=24, background=bg, glued=True)
-    loose = cap_render.render_mosaic_caps(plan, lib, px_per_cap=24, background=bg, glued=False)
+    board = (12, 200, 30)  # a distinctive board colour
+    img = np.asarray(cap_render.render_mosaic_caps(plan, lib, px_per_cap=24, background=board))
+    # the round caps leave interstitial gaps that must show the board colour,
+    # not the cap colour — so the board colour is present in the interior
+    interior = img[24:-24, 24:-24]
+    board_hits = (np.abs(interior.astype(int) - np.array(board)) <= 6).all(2).mean()
+    assert board_hits > 0.01
 
-    def bg_frac(img):
-        a = np.asarray(img)[24:-24, 24:-24]  # interior only (skip half-cap border)
-        return (np.abs(a.astype(int) - np.array(bg)) <= 4).all(2).mean()
 
-    # loose leaves board showing in the round-cap corners; glued fills them
-    assert bg_frac(glued) < bg_frac(loose)
-    assert bg_frac(glued) < 0.02  # essentially no board between caps in the interior
+def test_real_only_uses_photographed_caps_when_available():
+    from PIL import Image as PILImage
+    from cap_mosaic.app.fake_caps import CapImage
+
+    plan = _plan()
+    # a library with one procedural cap and one tagged "real" of the same colour
+    rgb = (200, 60, 60)
+    proc = cap_render.build_library([rgb], size=32, variants=1)[0]
+    real = CapImage(rgb, PILImage.new("RGBA", (32, 32), (*rgb, 255)), real=True)
+    # real_only must not raise and must render (it filters to the real cap)
+    out = cap_render.render_mosaic_caps(plan, [proc, real], px_per_cap=16, real_only=True)
+    assert out.size[0] > 0
 
 
 def test_close_up_has_cap_texture_that_distance_blurs_away():

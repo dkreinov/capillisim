@@ -19,7 +19,15 @@
         <p>Drag &amp; drop an image here<br /><small>or click to choose · or paste (Ctrl/Cmd+V)</small></p>
       </div>
 
-      <img id="orig" class="orig" hidden alt="your image" />
+      <div id="origwrap" class="origwrap" hidden>
+        <img id="orig" class="orig" alt="your image" draggable="false" />
+        <div id="sel" class="sel" hidden></div>
+      </div>
+      <div id="croptools" class="croptools" hidden>
+        <small>Drag on the image to select a region.</small>
+        <button id="cropBtn" disabled>✂ Crop to selection</button>
+        <button id="resetImg">↺ Full image</button>
+      </div>
 
       <div class="controls" id="controls" hidden>
         <div class="mode">
@@ -37,6 +45,10 @@
             </select>
           </label>
           <label class="chk"><input type="checkbox" id="thicken" /> Thicken outlines</label>
+          <label class="chk"><input type="checkbox" id="realOnly" /> Real caps only</label>
+          <label>Board:
+            <input type="color" id="bgColor" value="#3c2d23" title="backing board colour (wood / paper / paint)" />
+          </label>
         </div>
 
         <label class="slider">Size (width): <b id="sizeVal">2.5 m</b>

@@ -11,7 +11,15 @@ main { display:grid; grid-template-columns:340px 1fr; gap:20px; padding:18px 26p
 .dropzone.hot { border-color:var(--acc); color:var(--ink); background:#20242f; }
 .dropzone small { color:var(--mut); }
 
-.orig { display:block; width:100%; margin-top:12px; border-radius:12px; border:1px solid #333a49; }
+.origwrap { position:relative; margin-top:12px; display:inline-block; width:100%; line-height:0; }
+.orig { display:block; width:100%; border-radius:12px; border:1px solid #333a49; cursor:crosshair; user-select:none; }
+.sel { position:absolute; border:2px dashed #6cf; background:rgba(100,180,255,.18); pointer-events:none; }
+.croptools { margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.croptools small { color:var(--mut); margin-right:auto; }
+.croptools button { padding:4px 10px; }
+.palette { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:12px; color:var(--mut); }
+.palette .chk { display:flex; align-items:center; gap:5px; }
+.palette input[type=color] { width:34px; height:22px; padding:0; border:1px solid #333a49; background:none; }
 .controls { margin-top:18px; background:var(--panel); border-radius:14px; padding:16px; }
 .mode { display:flex; gap:16px; margin-bottom:12px; color:var(--mut); }
 .slider { display:block; margin:14px 0; color:var(--mut); }
