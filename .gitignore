@@ -9,6 +9,10 @@ dist/
 venv/
 env/
 
+# Secrets — never commit
+.env
+kaggle.json
+
 # Tooling
 .pytest_cache/
 .mypy_cache/
