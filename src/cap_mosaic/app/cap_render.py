@@ -19,16 +19,18 @@ from .fake_caps import CapImage, fake_cap_library, render_fake_cap
 
 
 def _load_circular(path: str, size: int) -> Image.Image | None:
-    """A real cap crop, resized and masked to a circle (RGBA)."""
+    """A real cap crop auto-cropped to its disc and masked to a circle (RGBA).
+
+    Captured crops frame the cap inconsistently (off-centre, with background), so
+    a plain resize makes cap sizes look uneven. Detect the cap disc and cut it out
+    tightly so every real cap ends up the same size, like the procedural ones.
+    """
+    from .cap_crop import cap_cutout_from_path
+
     try:
-        im = Image.open(path).convert("RGB").resize((size, size), Image.LANCZOS)
-    except (OSError, ValueError):
+        return cap_cutout_from_path(path, size)
+    except Exception:  # noqa: BLE001 - a bad crop just drops that one cap
         return None
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).ellipse([1, 1, size - 2, size - 2], fill=255)
-    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    out.paste(im, (0, 0), mask)
-    return out
 
 
 @lru_cache(maxsize=8)

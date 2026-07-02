@@ -181,7 +181,7 @@ def simulate(
     distance_m: float | None = Query(None),
     colors: int = 12,
     bare_white: bool = True,
-    real_caps: bool = False,
+    real_caps: bool = True,
     preset: str | None = None,
     thicken: bool = False,
 ) -> Response:
@@ -194,10 +194,9 @@ def simulate(
     capped_across = max(1, min(res["caps_across"], _MAX_CAPS_ACROSS))
     px_per_cap = max(6, min(22, _SIM_WIDTH_PX // capped_across))
     palette = list({tuple(c.rgb) for c in plan.cells if not c.is_hole})
-    # Real bottle caps are all one physical size, so render uniform procedural
-    # caps by default. The captured caps.db crops are inconsistently framed (cap
-    # off-centre with background), which makes cap sizes look uneven — opt in with
-    # real_caps=true only once a cleanly-cropped dataset is imported.
+    # Real caps are auto-cropped to their disc (see cap_crop) so every cap is the
+    # same size; blend them in for photographic realism. Set real_caps=false for
+    # clean procedural caps only.
     db = str(_DB) if (real_caps and _DB.exists()) else None
     lib = build_library(palette, db_path=db, size=64)
     mosaic = render_mosaic_caps(plan, lib, px_per_cap=px_per_cap)
