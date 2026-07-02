@@ -35,6 +35,7 @@ _DB = Path("dataset/caps.db")
 _MAX_CAPS_ACROSS = 140  # render resolution ceiling; bigger size -> more detail
 _SIM_WIDTH_PX = 1200  # target simulation width; tile px adapts to keep it bounded
 _FRAME_PX = (900, 650)  # fixed field-of-view frame the mosaic shrinks inside
+_INV_TOL = 12.0  # CIEDE2000 within which an owned cap counts toward a BOM colour
 
 
 _STATIC = Path(__file__).parent / "static"
@@ -165,6 +166,7 @@ def estimate(
     preset: str | None = None,
     thicken: bool = False,
     dither: bool = False,
+    inventory: bool = False,
 ) -> dict:
     """Solve one axis from the other in a single call. When both size_mm and
     distance_m are given, size drives the geometry and distance drives the
@@ -209,7 +211,38 @@ def estimate(
             f"{thin} cap(s) sit on ~1-cap-thin outlines that may vanish at "
             f"distance — enlarge the piece or enable 'thicken outlines'."
         )
+
+    # Inventory gap: match your scanned caps (caps.db) against the BOM. Report
+    # only — the plan is not constrained by what you own.
+    if inventory and _DB.exists():
+        res["inventory"], res["inventory_totals"] = _inventory_report(counts)
     return res
+
+
+def _inventory_report(need: Counter) -> tuple[dict, dict]:
+    """have / need / short per BOM colour from caps.db (greedy nearest, dE00<=12)."""
+    from ..planner_designer import load_inventory
+    from ...core.palette import ciede2000, rgb_to_lab
+
+    inv = load_inventory(str(_DB))
+    bom_labs = [(rgb, rgb_to_lab(rgb)) for rgb in need]
+    have = {rgb: 0 for rgb in need}
+    for cap in inv:  # assign each owned cap to its nearest BOM colour within dE00 12
+        clab = rgb_to_lab(cap.rgb)
+        best_rgb, best_de = None, _INV_TOL
+        for rgb, lab in bom_labs:
+            de = ciede2000(clab, lab)
+            if de <= best_de:
+                best_de, best_rgb = de, rgb
+        if best_rgb is not None:
+            have[best_rgb] += 1
+    report = {
+        "#%02x%02x%02x" % rgb: {"need": need[rgb], "have": have[rgb],
+                                "short": max(0, need[rgb] - have[rgb])}
+        for rgb, _ in need.most_common()
+    }
+    totals = {"owned": len(inv), "have": sum(have.values()), "need": sum(need.values())}
+    return report, totals
 
 
 @app.get("/simulate")

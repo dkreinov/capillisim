@@ -21,11 +21,13 @@ function thicken() { return $("thicken").checked; }
 function dither() { return $("dither").checked; }
 function bgColor() { return $("bgColor").value; }
 function realOnly() { return $("realOnly").checked; }
+function useInv() { return $("useInv").checked; }
 function extraParams() {
   const p = { bg_color: bgColor(), dither: dither() };
   if (preset()) p.preset = preset();
   if (thicken()) p.thicken = true;
   if (realOnly()) p.real_only = true;
+  if (useInv()) p.inventory = true;
   return p;
 }
 
@@ -87,6 +89,7 @@ $("preset").addEventListener("change", refresh);
 $("thicken").addEventListener("change", refresh);
 $("realOnly").addEventListener("change", refresh);
 $("dither").addEventListener("change", refresh);
+$("useInv").addEventListener("change", refresh);
 
 // hold the compare button to swap the cap sim for the original (same framing)
 const _cmp = $("compareBtn");
@@ -203,13 +206,24 @@ async function refresh() {
     warn.textContent = [msg, hint].filter(Boolean).join("  ");
   } else { warn.hidden = true; }
 
+  // inventory gap (have/need/short), when "Use my caps" is on
+  const inv = b.inventory || null;
+  const it = $("invtotals");
+  if (b.inventory_totals) {
+    const t = b.inventory_totals;
+    it.hidden = false;
+    it.textContent = `you own ${t.owned} caps — ${t.have} of ${t.need} needed (${(100 * t.have / Math.max(1, t.need)).toFixed(1)}%)`;
+  } else { it.hidden = true; }
+
   // BOM — click a colour to isolate where those caps go (others ghosted)
   const ul = $("bom"); ul.innerHTML = "";
   if (highlight && !(highlight in b.bom)) highlight = null;  // colour no longer present
   for (const [hex, n] of Object.entries(b.bom)) {
     const li = document.createElement("li");
     li.className = "bomrow" + (hex === highlight ? " active" : "");
-    li.innerHTML = `<span class="sw" style="background:${hex}"></span>${hex} <b>${n}</b>`;
+    let extra = "";
+    if (inv && inv[hex]) extra = ` <span class="inv">have ${inv[hex].have} · short ${inv[hex].short}</span>`;
+    li.innerHTML = `<span class="sw" style="background:${hex}"></span>${hex} <b>${n}</b>${extra}`;
     li.addEventListener("click", () => { highlight = (highlight === hex) ? null : hex; refresh(); });
     ul.appendChild(li);
   }

@@ -168,6 +168,30 @@ def test_simulate_accepts_board_colour_and_real_only():
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
 
 
+def test_inventory_report_have_need_short(tmp_path, monkeypatch):
+    from cap_mosaic.app.webapp import server
+    from cap_mosaic.data.store import CapDataset
+
+    dbp = tmp_path / "caps.db"
+    with CapDataset(dbp) as db:
+        for _ in range(3):
+            db.add_cap((205, 25, 25), captured_at="t")  # ~red, within dE 12
+        db.add_cap((30, 60, 200), captured_at="t")       # blue, far from red
+    monkeypatch.setattr(server, "_DB", dbp)
+
+    buf = io.BytesIO()
+    Image.new("RGB", (120, 120), (200, 30, 30)).save(buf, format="PNG")
+    buf.seek(0)
+    iid = client.post("/upload", files={"file": ("r.png", buf, "image/png")}).json()["id"]
+    b = client.get("/estimate", params={"image_id": iid, "size_mm": 2000,
+                                        "inventory": True}).json()
+    assert "inventory" in b
+    row = next(iter(b["inventory"].values()))          # the single red BOM colour
+    assert row["have"] == 3                             # 3 red caps match; blue doesn't
+    assert row["short"] == row["need"] - 3
+    assert b["inventory_totals"] == {"owned": 4, "have": 3, "need": row["need"]}
+
+
 def test_capmap_returns_pdf_and_png():
     iid = _upload()
     pdf = client.get("/capmap", params={"image_id": iid, "size_mm": 1500, "format": "pdf"})
