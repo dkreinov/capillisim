@@ -27,6 +27,7 @@ from pathlib import Path
 import cv2
 
 from ..data.store import CapDataset, FrameRecord
+from .cap_color import median_rgb, mosaic_rgb_from_crop
 from ..vision.card_reader import (
     SPREAD_REJECT_DE,
     cap_present,
@@ -110,6 +111,7 @@ def main(argv: list[str] | None = None) -> None:
         frames: list[FrameRecord] = []
         fields: list[tuple[int, int, int]] = []
         marks: list[float] = []
+        mosaics: list[tuple[int, int, int]] = []
         for fk in range(args.frames_per_cap):
             ok2, b2 = cap.read()
             if not ok2:
@@ -125,6 +127,8 @@ def main(argv: list[str] | None = None) -> None:
             path = crops / f"cap_{idx:04d}_f{fk}.png"
             png = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
             cv2.imwrite(str(path), png)
+            # at-distance colour: linear-light mean of the whole face (logo mixed in)
+            mosaics.append(mosaic_rgb_from_crop(crop))
             # the cap's true colour for this frame: dominant field, logo excluded
             fld = read_cap_field(wb, h2)
             col_f = fld[0] if fld else None
@@ -155,9 +159,10 @@ def main(argv: list[str] | None = None) -> None:
         # robust per-cap values = median across frame reads (1 bad frame can't skew it)
         color = _median_rgb(fields) if fields else tuple(col_use)
         marking = _median(marks) if marks else None
+        mosaic = median_rgb(mosaics) if mosaics else None
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         db.add_cap(color, frames, captured_at=now, source="card_capture",
-                   marking_frac=marking)
+                   marking_frac=marking, mosaic_rgb=mosaic)
         threading.Thread(target=_ding, daemon=True).start()
         flash_msg, flash_color = f"SAVED #{idx}", (60, 235, 90)
         flash_until = time.time() + 0.8
