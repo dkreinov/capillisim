@@ -42,6 +42,51 @@ DEFAULT_PALETTE: tuple[CapColor, ...] = (
 )
 
 
+# Curated small palettes for cap art. A tight, purpose-built palette reads far
+# better than many auto-clustered shades — "limited palette makes it powerful".
+# Subject-specific tone families (portrait skin ramp, sunset bands, space).
+PORTRAIT_PALETTE: tuple[CapColor, ...] = (
+    CapColor("outline", (25, 22, 20)),      # hair / dark outline
+    CapColor("deepshadow", (60, 40, 32)),   # deep shadow
+    CapColor("shadow", (110, 72, 55)),      # mid shadow
+    CapColor("skin", (188, 132, 98)),       # skin midtone
+    CapColor("highlight", (236, 206, 176)), # highlight
+    CapColor("backdrop", (62, 72, 92)),     # cool background
+)
+
+SUNSET_PALETTE: tuple[CapColor, ...] = (
+    CapColor("night", (32, 26, 62)),        # dark blue / purple sky
+    CapColor("purple", (98, 46, 112)),
+    CapColor("red", (202, 56, 60)),
+    CapColor("orange", (230, 120, 50)),
+    CapColor("yellow", (240, 205, 92)),
+    CapColor("sun", (250, 244, 220)),
+    CapColor("sea", (20, 30, 42)),          # dark sea / ground
+)
+
+SPACE_PALETTE: tuple[CapColor, ...] = (
+    CapColor("void", (12, 12, 18)),         # black background
+    CapColor("deepblue", (26, 36, 72)),
+    CapColor("nebula", (82, 50, 112)),      # purple nebula
+    CapColor("star", (226, 228, 236)),      # silver/white stars
+    CapColor("ring", (236, 176, 72)),       # accretion-ring gold
+    CapColor("flare", (220, 110, 46)),      # orange
+    CapColor("ember", (172, 52, 56)),       # red
+)
+
+PRESETS: dict[str, tuple[CapColor, ...]] = {
+    "default": DEFAULT_PALETTE,
+    "portrait": PORTRAIT_PALETTE,
+    "sunset": SUNSET_PALETTE,
+    "space": SPACE_PALETTE,
+}
+
+
+def preset_palette(name: str) -> tuple[CapColor, ...] | None:
+    """A curated palette by name (portrait/sunset/space/default), or None."""
+    return PRESETS.get((name or "").strip().lower())
+
+
 def _srgb_to_linear(c: float) -> float:
     c /= 255.0
     return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4

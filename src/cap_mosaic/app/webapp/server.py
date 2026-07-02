@@ -21,8 +21,9 @@ from PIL import Image
 from ...core import estimator
 from ...core.geometry import Cap, grid_for_caps_across
 from ...core.sizing import apparent_fraction
+from ...core.palette import preset_palette
 from ..cap_render import build_library, render_mosaic_caps
-from ..planner_designer import plan_from_image, view_at_distance
+from ..planner_designer import count_thin_outlines, plan_from_image, view_at_distance
 
 app = FastAPI(title="Capillisim Mosaic Estimator")
 
@@ -85,12 +86,18 @@ def _floor(image_id: str, img: Image.Image, mode: str) -> int:
 
 
 def _plan(image_id: str, img: Image.Image, caps_across: int, colors: int,
-          bare_white: bool = True):
+          bare_white: bool = True, preset: str | None = None, thicken: bool = False):
     caps_across = max(1, min(caps_across, _MAX_CAPS_ACROSS))
-    key = (image_id, caps_across, colors, bare_white)
+    key = (image_id, caps_across, colors, bare_white, preset, thicken)
     if key not in _PLANS:
         grid = grid_for_caps_across(caps_across, img.width / img.height, Cap())
-        _PLANS[key] = plan_from_image(img, grid, colors=colors, bare_white=bare_white)
+        pal = preset_palette(preset) if preset else None
+        if pal is not None:  # a curated palette overrides k-means colour derivation
+            _PLANS[key] = plan_from_image(img, grid, palette=pal, bare_white=bare_white,
+                                          thicken_outlines=thicken)
+        else:
+            _PLANS[key] = plan_from_image(img, grid, colors=colors, bare_white=bare_white,
+                                          thicken_outlines=thicken)
     return _PLANS[key]
 
 
@@ -116,6 +123,8 @@ def estimate(
     distance_m: float | None = Query(None),
     colors: int = 12,
     bare_white: bool = True,
+    preset: str | None = None,
+    thicken: bool = False,
 ) -> dict:
     """Solve one axis from the other in a single call. When both size_mm and
     distance_m are given, size drives the geometry and distance drives the
@@ -128,7 +137,8 @@ def estimate(
         res["distance_m"] = round(distance_m, 2)
         res["read_quality"] = estimator.read_quality(pitch_mm, distance_m)
 
-    plan = _plan(image_id, img, res["caps_across"], colors, bare_white=bare_white)
+    plan = _plan(image_id, img, res["caps_across"], colors, bare_white=bare_white,
+                 preset=preset, thicken=thicken)
     counts = Counter(tuple(c.rgb) for c in plan.cells if not c.is_hole)
     palette = list(counts.keys())
     view_d = res.get("distance_m") or res.get("recommended_distance_m") or 5.0
@@ -150,6 +160,15 @@ def estimate(
     # Share of the viewer's field of view the piece fills at the current distance
     # (drives the framed-view readout; matches view_at_distance's shrink).
     res["apparent_pct"] = round(100.0 * apparent_fraction(res["width_mm"] / 1000.0, view_d))
+    # Thin dark outlines (~1 cap wide) tend to vanish at distance; flag them so
+    # the user can enlarge or turn on thicken.
+    thin = count_thin_outlines(plan)
+    res["thin_features"] = thin
+    if thin and not thicken:
+        res["thin_hint"] = (
+            f"{thin} cap(s) sit on ~1-cap-thin outlines that may vanish at "
+            f"distance — enlarge the piece or enable 'thicken outlines'."
+        )
     return res
 
 
@@ -162,16 +181,25 @@ def simulate(
     distance_m: float | None = Query(None),
     colors: int = 12,
     bare_white: bool = True,
+    real_caps: bool = False,
+    preset: str | None = None,
+    thicken: bool = False,
 ) -> Response:
     img = _get(image_id)
     res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
-    plan = _plan(image_id, img, res["caps_across"], colors, bare_white=bare_white)
+    plan = _plan(image_id, img, res["caps_across"], colors, bare_white=bare_white,
+                 preset=preset, thicken=thicken)
     # adapt tile pixels to how many caps there are, so a bigger piece shows more
     # detail while the output stays a bounded size.
     capped_across = max(1, min(res["caps_across"], _MAX_CAPS_ACROSS))
     px_per_cap = max(6, min(22, _SIM_WIDTH_PX // capped_across))
     palette = list({tuple(c.rgb) for c in plan.cells if not c.is_hole})
-    lib = build_library(palette, db_path=str(_DB) if _DB.exists() else None, size=64)
+    # Real bottle caps are all one physical size, so render uniform procedural
+    # caps by default. The captured caps.db crops are inconsistently framed (cap
+    # off-centre with background), which makes cap sizes look uneven — opt in with
+    # real_caps=true only once a cleanly-cropped dataset is imported.
+    db = str(_DB) if (real_caps and _DB.exists()) else None
+    lib = build_library(palette, db_path=db, size=64)
     mosaic = render_mosaic_caps(plan, lib, px_per_cap=px_per_cap)
     if distance_m is not None:
         # Shrink the sharp mosaic into a fixed FOV frame; caps merge via the

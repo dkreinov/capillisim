@@ -68,6 +68,31 @@ def test_bare_white_reduces_total_caps():
     assert on["total_caps"] < off["total_caps"]
 
 
+def test_estimate_reports_thin_features_and_thicken_reduces_them():
+    # white image with a 1-cap-wide dark cross
+    buf = io.BytesIO()
+    im = Image.new("RGB", (200, 200), (245, 245, 245))
+    for i in range(200):
+        for w in range(96, 104):
+            im.putpixel((w, i), (20, 20, 20))
+            im.putpixel((i, w), (20, 20, 20))
+    im.save(buf, format="PNG")
+    buf.seek(0)
+    iid = client.post("/upload", files={"file": ("cross.png", buf, "image/png")}).json()["id"]
+    plain = client.get("/estimate", params={"image_id": iid, "size_mm": 2000}).json()
+    thick = client.get("/estimate", params={"image_id": iid, "size_mm": 2000, "thicken": True}).json()
+    assert plain["thin_features"] > 0
+    assert "thin_hint" in plain
+    assert thick["thin_features"] < plain["thin_features"]
+
+
+def test_estimate_preset_uses_curated_palette():
+    iid = _upload()
+    b = client.get("/estimate", params={"image_id": iid, "size_mm": 3000, "preset": "portrait"}).json()
+    # portrait preset has 6 tones; used colours never exceed that
+    assert b["colors_used"] <= 6
+
+
 def test_estimate_reports_minimal_size_and_closest_distance():
     iid = _upload()
     b = client.get("/estimate", params={"image_id": iid, "size_mm": 3000}).json()

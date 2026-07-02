@@ -27,6 +27,18 @@
           <label><input type="radio" name="mode" value="pattern" /> Pattern</label>
         </div>
 
+        <div class="palette">
+          <label>Palette:
+            <select id="preset">
+              <option value="">Auto (from image)</option>
+              <option value="portrait">Portrait (6 tones)</option>
+              <option value="sunset">Sunset</option>
+              <option value="space">Space</option>
+            </select>
+          </label>
+          <label class="chk"><input type="checkbox" id="thicken" /> Thicken outlines</label>
+        </div>
+
         <label class="slider">Size (width): <b id="sizeVal">2.5 m</b>
           <input id="size" type="range" min="200" max="12000" step="50" value="2500" />
         </label>

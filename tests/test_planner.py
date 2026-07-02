@@ -132,6 +132,27 @@ def test_bare_white_leaves_white_border_as_holes():
     assert plan2.hole_count == 0
 
 
+def test_thicken_outlines_widens_thin_dark_strokes():
+    # white field with a 1-cap-wide vertical black stripe
+    size, across = 200, 20
+    cell = size // across
+    img = Image.new("RGB", (size, size), (245, 245, 245))
+    x = (across // 2) * cell
+    for xx in range(x, x + cell):
+        for yy in range(size):
+            img.putpixel((xx, yy), (20, 20, 20))
+    grid = grid_for_caps_across(across, aspect_ratio=1.0, cap=Cap())
+
+    plain = designer.plan_from_image(img, grid)
+    thick = designer.plan_from_image(img, grid, thicken_outlines=True)
+    # the thin stripe is flagged before thickening and reduced after
+    assert designer.count_thin_outlines(plain) > 0
+    assert designer.count_thin_outlines(thick) < designer.count_thin_outlines(plain)
+    # thickening adds dark caps (the stripe grew wider)
+    dark = lambda p: sum(1 for c in p.cells if not c.is_hole and max(c.rgb) < 90)
+    assert dark(thick) > dark(plain)
+
+
 def test_holes_roundtrip_and_are_skipped_by_matcher():
     from cap_mosaic.core.matcher import Matcher
 

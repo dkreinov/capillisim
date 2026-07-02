@@ -12,6 +12,7 @@ import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
+from ..core import features
 from ..core.geometry import Grid
 from ..core.palette import DEFAULT_PALETTE, CapColor, distance, nearest
 from ..core.plan import GridPlan, PlannedCell
@@ -176,6 +177,7 @@ def plan_from_image(
     inventory: tuple[CapColor, ...] | None = None,
     bare_white: bool = False,
     white_level: int = 238,
+    thicken_outlines: bool = False,
 ) -> GridPlan:
     """Sample `image` at each cap location and quantize to a cap palette.
 
@@ -245,6 +247,9 @@ def plan_from_image(
             )
         )
 
+    if thicken_outlines and cells:
+        _thicken_outline_cells(cells, palette)
+
     return GridPlan(
         cap_diameter_mm=grid.cap.diameter_mm,
         width_mm=grid.width_mm,
@@ -252,6 +257,41 @@ def plan_from_image(
         cells=cells,
         title=title,
     )
+
+
+def _cell_grid(cells: list[PlannedCell]) -> tuple[np.ndarray, dict]:
+    """Rebuild the (rows, cols, 3) cap-colour grid from a cell list (light = gap)."""
+    rows = max(c.row for c in cells) + 1
+    cols = max(c.col for c in cells) + 1
+    grid = np.full((rows, cols, 3), 255, np.uint8)
+    by_rc: dict[tuple[int, int], PlannedCell] = {}
+    for c in cells:
+        grid[c.row, c.col] = c.rgb
+        by_rc[(c.row, c.col)] = c
+    return grid, by_rc
+
+
+def count_thin_outlines(plan: GridPlan) -> int:
+    """Cap cells sitting on a ~1-cap-thin dark stroke (likely to vanish at distance)."""
+    if not plan.cells:
+        return 0
+    grid, _ = _cell_grid(plan.cells)
+    return features.count_thin_features(grid)
+
+
+def _thicken_outline_cells(cells: list[PlannedCell], palette: tuple[CapColor, ...]) -> None:
+    """Widen ~1-cap-thin dark strokes to 2 caps in-place so outlines survive."""
+    grid, by_rc = _cell_grid(cells)
+    thick = features.thicken_dark_lines(grid)
+    changed = np.any(thick != grid, axis=2)
+    for r, c in zip(*np.where(changed)):
+        cell = by_rc.get((int(r), int(c)))
+        if cell is None:
+            continue
+        cap = nearest(tuple(int(v) for v in thick[r, c]), palette)
+        cell.rgb = cap.rgb
+        cell.color_name = cap.name
+        cell.is_hole = False
 
 
 def render_mosaic(

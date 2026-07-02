@@ -11,6 +11,14 @@ function mode() {
 }
 function sizeMm() { return Number($("size").value); }
 function distM() { return Number($("dist").value); }
+function preset() { return $("preset").value; }
+function thicken() { return $("thicken").checked; }
+function extraParams() {
+  const p = {};
+  if (preset()) p.preset = preset();
+  if (thicken()) p.thicken = true;
+  return p;
+}
 
 function readQuality(d) {
   const arc = (PITCH / 1000) / d * ARCMIN;
@@ -63,6 +71,8 @@ async function upload(file) {
 $("size").addEventListener("input", () => { $("sizeVal").textContent = (sizeMm() / 1000).toFixed(2) + " m"; debounced(); });
 $("dist").addEventListener("input", () => { $("distVal").textContent = distM().toFixed(1) + " m"; debounced(); });
 document.querySelectorAll('input[name=mode]').forEach((r) => r.addEventListener("change", refresh));
+$("preset").addEventListener("change", refresh);
+$("thicken").addEventListener("change", refresh);
 
 $("fitSize").addEventListener("click", async () => {
   const b = await estimate({ distance_m: distM() });
@@ -89,7 +99,7 @@ function debounced() { clearTimeout(timer); timer = setTimeout(refresh, 250); }
 
 async function estimate(params) {
   if (!imageId) return null;
-  const q = new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, ...params });
+  const q = new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, ...extraParams(), ...params });
   const r = await fetch("/estimate?" + q.toString());
   if (!r.ok) return null;
   return r.json();
@@ -108,9 +118,11 @@ async function refresh() {
   $("colours").textContent = `${b.colors_used} / ${b.effective_colors}`;
 
   const warn = $("warning");
-  if (b.warning || !b.legible) {
+  const msg = b.warning || (!b.legible ? "Too few caps to represent this image." : "") ;
+  const hint = b.thin_hint || "";
+  if (msg || hint) {
     warn.hidden = false;
-    warn.textContent = b.warning || "Too few caps to represent this image.";
+    warn.textContent = [msg, hint].filter(Boolean).join("  ");
   } else { warn.hidden = true; }
 
   // BOM
@@ -122,7 +134,7 @@ async function refresh() {
   }
 
   // simulation
-  const q = new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, size_mm: sizeMm(), distance_m: distM() });
+  const q = new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, size_mm: sizeMm(), distance_m: distM(), ...extraParams() });
   $("sim").src = "/simulate?" + q.toString() + "&_=" + Date.now();
   const pct = b.apparent_pct != null ? `fills ~${b.apparent_pct}% of your view` : "";
   $("simhint").textContent =
