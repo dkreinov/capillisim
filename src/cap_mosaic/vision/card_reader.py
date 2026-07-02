@@ -16,11 +16,15 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from ..core.palette import RGB, Lab, ciede2000, rgb_to_lab
+from ..core.palette import RGB, Lab, ciede2000, lab_to_rgb, rgb_to_lab
 from . import card_layout as L
 
 GLARE_LEVEL = 240  # pixels brighter than this in all channels are treated as glare
 MARKING_MIN_DE = 8.0  # field/marking clusters closer than this -> cap is one colour
+# After the illuminant cast is subtracted, a cap this close to neutral in Lab is
+# snapped to true gray (kills the last of a silver/black metallic bias). Kept low
+# so genuine low-saturation caps (tan, cream, gold) are not desaturated.
+NEUTRAL_CHROMA = 6.0
 
 # Presence detection (a cap can't be told from the white card circle by
 # brightness alone). A real cap adds colour (saturated pixels) and/or texture
@@ -144,6 +148,51 @@ def _inner_circle_pixels(
     return pixels if pixels.size else None
 
 
+def gray_cast_lab(rgb: np.ndarray, h: np.ndarray) -> tuple[float, float]:
+    """Residual illuminant cast (a*, b*) left on the gray strip after white balance.
+
+    White balance fits the gray patches to neutral, but on a warm illuminant a
+    small warm residual survives (and specular caps mirror it strongly). We read
+    that leftover cast straight off the printed gray rectangles and subtract it
+    from cap colours. Clipped patches (near black/white lose chroma) are skipped.
+    """
+    ab: list[tuple[float, float]] = []
+    for g in L.GRAY_PATCHES:
+        cx, cy, rad = _region_px(h, g.cx_mm, g.cy_mm, L.GRAY_SIZE_MM * 0.30)
+        med = _sample_median(rgb, cx, cy, rad)
+        if med.max() > 235 or med.min() < 20:  # clipped -> unreliable cast
+            continue
+        _, a, b = rgb_to_lab((int(med[0]), int(med[1]), int(med[2])))
+        ab.append((a, b))
+    if not ab:
+        return (0.0, 0.0)
+    arr = np.asarray(ab)
+    return (float(np.median(arr[:, 0])), float(np.median(arr[:, 1])))
+
+
+def neutralize_cast(
+    field_rgb: RGB, cast_ab: tuple[float, float], neutral_chroma: float = NEUTRAL_CHROMA
+) -> RGB:
+    """Remove the illuminant cast from a cap colour, then snap the last residue
+    of near-neutral caps (silver / gray / black) to true neutral.
+
+    Primary fix: subtract the gray-strip residual cast in Lab — this reads the
+    warm light off the printed rectangles and takes it off every cap (a metallic
+    cap mirrors that same warm light, so subtracting it neutralises the tan/brown
+    read). Then, only for what's already essentially neutral (chroma <
+    `neutral_chroma`), scale a*/b* toward 0. Saturated caps are left untouched.
+    """
+    l, a, b = rgb_to_lab(field_rgb)
+    a -= cast_ab[0]
+    b -= cast_ab[1]
+    chroma = (a * a + b * b) ** 0.5
+    if chroma < neutral_chroma:  # neutral attractor: silver/gray/black -> neutral
+        k = chroma / neutral_chroma  # 0 at true gray, ->1 near the threshold
+        a *= k
+        b *= k
+    return lab_to_rgb((l, a, b))
+
+
 def _deglare(pixels: np.ndarray, glare_level: int) -> np.ndarray:
     """Drop bright (glare) pixels, but only when they're a minority.
 
@@ -170,7 +219,8 @@ def read_cap_color(
 
 
 def read_cap_field(
-    rgb: np.ndarray, h: np.ndarray, glare_level: int = GLARE_LEVEL
+    rgb: np.ndarray, h: np.ndarray, glare_level: int = GLARE_LEVEL,
+    neutralize: bool = True,
 ) -> tuple[RGB, float, float] | None:
     """Dominant *field* colour of the cap, separated from any logo/marking.
 
@@ -184,10 +234,15 @@ def read_cap_field(
     pixels = _inner_circle_pixels(rgb, h)
     if pixels is None:
         return None
+    cast = gray_cast_lab(rgb, h) if neutralize else (0.0, 0.0)
+
+    def fix(c: RGB) -> RGB:
+        return neutralize_cast(c, cast) if neutralize else c
+
     px = _deglare(pixels, glare_level).astype(np.uint8)
     if len(px) < 2:
         med = np.median(px, axis=0)
-        return (int(med[0]), int(med[1]), int(med[2])), 0.0, 0.0
+        return fix((int(med[0]), int(med[1]), int(med[2]))), 0.0, 0.0
 
     lab = cv2.cvtColor(px.reshape(-1, 1, 3), cv2.COLOR_RGB2LAB).reshape(-1, 3)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
@@ -204,9 +259,9 @@ def read_cap_field(
     spread = ciede2000(rgb_to_lab(field_rgb), rgb_to_lab(other_rgb))
     if spread < MARKING_MIN_DE:  # one colour: the split is just noise
         med = np.median(px, axis=0)
-        return (int(med[0]), int(med[1]), int(med[2])), 0.0, float(spread)
+        return fix((int(med[0]), int(med[1]), int(med[2]))), 0.0, float(spread)
     marking_frac = float(counts[1 - big] / counts.sum())
-    return field_rgb, marking_frac, float(spread)
+    return fix(field_rgb), marking_frac, float(spread)
 
 
 def presence_metrics(rgb: np.ndarray, h: np.ndarray) -> tuple[float, float] | None:

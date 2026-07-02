@@ -108,6 +108,27 @@ def rgb_to_lab(rgb: RGB) -> Lab:
     return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
 
 
+def _linear_to_srgb(c: float) -> float:
+    c = max(0.0, min(1.0, c))
+    return c * 12.92 if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+
+
+def lab_to_rgb(lab: Lab) -> RGB:
+    """Inverse of `rgb_to_lab`: CIELAB (D65) -> sRGB 0..255, clamped."""
+    l, a, b = lab
+    fy = (l + 16) / 116
+    fx, fz = fy + a / 500, fy - b / 200
+
+    def finv(t: float) -> float:
+        return t**3 if t**3 > 0.008856 else (t - 16 / 116) / 7.787
+
+    x, y, z = 0.95047 * finv(fx), 1.0 * finv(fy), 1.08883 * finv(fz)
+    r = x * 3.2406 + y * -1.5372 + z * -0.4986
+    g = x * -0.9689 + y * 1.8758 + z * 0.0415
+    bl = x * 0.0557 + y * -0.2040 + z * 1.0570
+    return tuple(int(round(_linear_to_srgb(v) * 255)) for v in (r, g, bl))
+
+
 def ciede2000(lab1: Lab, lab2: Lab) -> float:
     """Perceptual color difference (CIEDE2000). Smaller is more similar."""
     l1, a1, b1 = lab1
