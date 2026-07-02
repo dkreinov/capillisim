@@ -72,6 +72,36 @@ def render_mosaic_projection(
     return img
 
 
+def render_stencil(
+    plan: GridPlan,
+    cal: Calibration,
+    color: tuple[int, int, int] | None = None,
+) -> Image.Image:
+    """Project the whole plan as a colour stencil at 1:1 on the table.
+
+    Every non-hole cell is filled with its cap colour, so you drop each cap onto
+    the disc that lights up in its colour. With ``color`` (an rgb tuple) only that
+    colour's cells are lit — the per-colour glue pass: fill all of one colour,
+    then move to the next. Holes are never lit; already-placed cells get a white
+    ring for progress. Pure (returns a PIL image), so it tests headless.
+    """
+    img = Image.new("RGB", (cal.proj_width, cal.proj_height), BLACK)
+    draw = ImageDraw.Draw(img)
+    r_mm = plan.cap_diameter_mm / 2.0
+    key = tuple(color) if color is not None else None
+    for cell in plan.cells:
+        if cell.is_hole:
+            continue  # a deliberate empty cell is never lit
+        if key is not None and tuple(cell.rgb) != key:
+            continue  # per-colour pass: only the chosen colour
+        cx, cy = cal.table_mm_to_proj_px(cell.x_mm, cell.y_mm)
+        r = cal.mm_radius_to_px(cell.x_mm, cell.y_mm, r_mm)
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=tuple(cell.rgb))
+        if cell.filled:
+            draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(255, 255, 255), width=2)
+    return img
+
+
 def _ring(draw, cal, cell, r_mm, color, width):
     cx, cy = cal.table_mm_to_proj_px(cell.x_mm, cell.y_mm)
     r = cal.mm_radius_to_px(cell.x_mm, cell.y_mm, r_mm)
