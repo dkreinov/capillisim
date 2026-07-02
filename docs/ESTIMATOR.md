@@ -53,16 +53,42 @@ the target and only reads once you stand far enough that caps blend.
   `white_level`, default 238) are left as **bare board** (holes), not paved with
   white caps. Controlled by `plan_from_image(bare_white=...)`; on by default in
   the app, overridable with `&bare_white=false`.
+- **Dither** — with `dither=true` (default on in the UI), non-hole cell colours
+  come from CIELAB Floyd–Steinberg error diffusion (`core/dither.py`) instead of
+  independent nearest-colour. A small palette then reproduces gradients/tones via
+  a blend the eye merges at distance, rather than banding. See docs/RESEARCH.md.
+- **Hold-to-compare (A/B)** — the `👁 hold to compare` button swaps the cap sim
+  for the *original* image framed identically (`/target`), so you can judge how
+  faithfully the caps read at the chosen size/distance.
+- **Printable cap map** — `⬇ Cap map (PDF)` downloads a paint-by-numbers sheet
+  (`app/cap_map.py`): a letter per colour on each cell, row/col rulers, and a
+  legend (letter · hex · count). The artifact you actually build from.
+- **Inventory gap** — `Use my caps` matches your scanned `caps.db` against the
+  BOM (greedy nearest, CIEDE2000 ≤ 12) and shows *have · short* per colour plus
+  *you own X of Y needed*. Report only — the plan is not constrained by stock.
 
 ## Endpoints
 
 - `POST /upload` — image -> `{id, width, height, aspect}`
-- `GET /estimate?image_id=&size_mm=|distance_m=&mode=&colors=&bare_white=` -> caps,
-  legibility, distances, `bom` (hex -> count), colours used/effective,
-  `apparent_pct` (share of field of view filled)
-- `GET /simulate?image_id=&size_mm=&distance_m=&mode=&bare_white=` -> cap-rendered
-  PNG of the fixed FOV frame: the sharp mosaic shrunk to the size it subtends at
-  the distance, surrounded by bare board
+- `GET /estimate?image_id=&size_mm=|distance_m=&mode=&colors=&bare_white=&preset=&thicken=&dither=&inventory=`
+  -> caps, legibility, distances, `bom` (hex -> count), colours used/effective,
+  `apparent_pct`, and (with `inventory=true`) `inventory` + `inventory_totals`
+- `GET /simulate?...&bg_color=&real_caps=&real_only=&preset=&thicken=&dither=&highlight=`
+  -> cap-rendered PNG of the fixed FOV frame: the sharp mosaic shrunk to the size
+  it subtends at the distance, on the chosen board colour
+- `GET /target?image_id=&size_mm=&distance_m=&mode=` -> the ORIGINAL image framed
+  exactly like `/simulate` (for hold-to-compare)
+- `GET /capmap?image_id=&...&format=pdf|png` -> printable paint-by-numbers cap map
+- `GET /crop?image_id=&x0=&y0=&x1=&y1=` / `GET /image?image_id=` -> region crop + preview
+
+## Building from caps (projector)
+
+Once you have a `.capproj.json` plan, `app/project_plan.py` projects it onto the
+board (`procam/render.render_stencil`): **S** lights every cell in its cap colour
+(a 1:1 stencil — drop each cap on its disc); **C** / **N** / **P** light one
+colour at a time so you glue a whole colour before moving on; **Q** quits. Display
+and keys are injected callables (headless-tested); `main` drives the real
+fullscreen projector. On-rig calibration + verification is still pending.
 
 ## Limitations / next
 

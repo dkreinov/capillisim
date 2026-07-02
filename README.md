@@ -50,3 +50,5 @@ this project. Details in `docs/PRIOR_ART.md`.
 - `docs/DATA_MODEL.md` — the SQLite cap dataset/inventory schema (caps + crops + quality + busy-ness + future embeddings).
 - `docs/HARDWARE.md` — the physical rig and the specs we still need.
 - `docs/ROADMAP.md` — phased scope, milestones, and the POC success criteria.
+- `docs/RESEARCH.md` — cap-image datasets to import and photomosaic/build techniques to adopt.
+- `docs/HANDOFF.md` — current state + what's built vs pending (start here to resume).
