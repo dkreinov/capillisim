@@ -54,4 +54,6 @@ main { display:grid; grid-template-columns:340px 1fr; gap:20px; padding:18px 26p
 .bom .bomrow:hover { background:#2a3140; }
 .bom .bomrow.active { background:#2f4d6b; border-color:#6cf; }
 .bom.isolating .bomrow:not(.active) { opacity:.5; }
+.capmaplink { float:right; font-size:13px; color:#6cf; text-decoration:none; font-weight:600; }
+.capmaplink:hover { text-decoration:underline; }
 @media (max-width:760px){ main{ grid-template-columns:1fr; } }

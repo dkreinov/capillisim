@@ -222,6 +222,9 @@ async function refresh() {
   $("sim").src = curSimSrc;
   const tq = new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, size_mm: sizeMm(), distance_m: distM() });
   curTargetSrc = "/target?" + tq.toString() + "&_=" + Date.now();
+  // printable cap map uses the same plan-shaping params (no distance needed)
+  const mq = new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, size_mm: sizeMm(), ...extraParams(), format: "pdf" });
+  $("capmap").href = "/capmap?" + mq.toString();
   const pct = b.apparent_pct != null ? `fills ~${b.apparent_pct}% of your view` : "";
   $("simhint").textContent =
     `${(sizeMm() / 1000).toFixed(2)} m wide, seen from ${distM().toFixed(1)} m — ${pct} · ${readQuality(distM())}`;

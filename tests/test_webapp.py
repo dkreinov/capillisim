@@ -168,6 +168,15 @@ def test_simulate_accepts_board_colour_and_real_only():
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
 
 
+def test_capmap_returns_pdf_and_png():
+    iid = _upload()
+    pdf = client.get("/capmap", params={"image_id": iid, "size_mm": 1500, "format": "pdf"})
+    png = client.get("/capmap", params={"image_id": iid, "size_mm": 1500, "format": "png"})
+    assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content[:4] == b"%PDF"
+    assert png.status_code == 200 and png.headers["content-type"] == "image/png"
+
+
 def test_target_is_frame_sized_and_differs_from_simulate():
     from cap_mosaic.app.webapp.server import _FRAME_PX
 

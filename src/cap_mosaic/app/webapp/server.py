@@ -22,6 +22,7 @@ from ...core import estimator
 from ...core.geometry import Cap, grid_for_caps_across
 from ...core.sizing import apparent_fraction
 from ...core.palette import preset_palette
+from ..cap_map import render_cap_map
 from ..cap_render import build_library, render_mosaic_caps
 from ..planner_designer import count_thin_outlines, plan_from_image, view_at_distance
 
@@ -254,6 +255,34 @@ def simulate(
         mosaic = view_at_distance(mosaic, res["width_mm"], distance_m, _FRAME_PX)
     buf = io.BytesIO()
     mosaic.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
+@app.get("/capmap")
+def capmap(
+    image_id: str,
+    mode: str = "picture",
+    pitch_mm: float = 32.0,
+    size_mm: float | None = Query(None),
+    distance_m: float | None = Query(None),
+    colors: int = 12,
+    bare_white: bool = True,
+    preset: str | None = None,
+    thicken: bool = False,
+    dither: bool = False,
+    format: str = "png",
+) -> Response:
+    """Printable paint-by-numbers cap map (PNG or PDF) for the current plan."""
+    img = _get(image_id)
+    res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
+    plan = _plan(image_id, img, res["caps_across"], colors, bare_white=bare_white,
+                 preset=preset, thicken=thicken, dither=dither)
+    sheet = render_cap_map(plan)
+    buf = io.BytesIO()
+    if format.lower() == "pdf":
+        sheet.save(buf, format="PDF")
+        return Response(content=buf.getvalue(), media_type="application/pdf")
+    sheet.save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png")
 
 
