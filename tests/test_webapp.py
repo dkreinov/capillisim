@@ -192,6 +192,14 @@ def test_inventory_report_have_need_short(tmp_path, monkeypatch):
     assert b["inventory_totals"] == {"owned": 4, "have": 3, "need": row["need"]}
 
 
+def test_critique_returns_score_and_recommendations():
+    iid = _upload()
+    b = client.get("/critique", params={"image_id": iid}).json()
+    assert 0 <= b["score"] <= 100
+    assert b["verdict"] in ("great", "good", "tricky", "poor")
+    assert b["tips"] and b["recommend"]["min_size_m"] > 0
+
+
 def test_capmap_returns_pdf_and_png():
     iid = _upload()
     pdf = client.get("/capmap", params={"image_id": iid, "size_mm": 1500, "format": "pdf"})

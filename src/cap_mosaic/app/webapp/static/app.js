@@ -77,9 +77,36 @@ async function upload(file) {
   $("stats").hidden = false;
   $("bomwrap").hidden = false;
   refresh();
+  loadCritique();
 }
 
 function setPreview(id) { $("orig").src = "/image?image_id=" + id + "&_=" + Date.now(); }
+
+let lastRec = null;
+async function loadCritique() {
+  if (!imageId) return;
+  const r = await fetch("/critique?" + new URLSearchParams({ image_id: imageId, mode: mode() }));
+  if (!r.ok) return;
+  const c = await r.json();
+  lastRec = c.recommend;
+  const box = $("critique"); box.hidden = false;
+  const s = $("cscore"); s.textContent = c.score;
+  s.className = "cscore " + c.verdict;
+  $("cverdict").textContent = `Cap-art check: ${c.verdict} (${c.score}/100)`;
+  $("csig").textContent = `contrast ${c.signals.contrast} · detail ${c.signals.detail_floor} caps · bg ${c.signals.bg_spread}`;
+  const ul = $("ctips"); ul.innerHTML = "";
+  for (const t of c.tips) { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); }
+}
+
+$("applyRec").addEventListener("click", () => {
+  if (!lastRec) return;
+  $("dither").checked = !!lastRec.dither;
+  $("thicken").checked = !!lastRec.thicken;
+  $("preset").value = lastRec.preset || "";
+  const w = Math.round((lastRec.min_size_m || 1) * 1000);
+  $("size").value = w; $("sizeVal").textContent = (w / 1000).toFixed(2) + " m";
+  refresh();
+});
 
 // --- controls ---
 $("size").addEventListener("input", () => { $("sizeVal").textContent = (sizeMm() / 1000).toFixed(2) + " m"; debounced(); });
@@ -146,13 +173,13 @@ $("cropBtn").addEventListener("click", async () => {
   const b = await r.json();
   imageId = b.id; aspect = b.aspect;
   setPreview(b.id); clearSelection();
-  refresh();
+  refresh(); loadCritique();
 });
 
 $("resetImg").addEventListener("click", () => {
   imageId = originalId; aspect = originalAspect;
   setPreview(originalId); clearSelection();
-  refresh();
+  refresh(); loadCritique();
 });
 
 $("fitSize").addEventListener("click", async () => {

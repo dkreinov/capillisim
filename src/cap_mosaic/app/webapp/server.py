@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
+from ...core import critique as critique_mod
 from ...core import estimator
 from ...core.geometry import Cap, grid_for_caps_across
 from ...core.sizing import apparent_fraction
@@ -152,6 +153,20 @@ def _solve(img: Image.Image, image_id: str, mode: str, pitch: float,
         return estimator.solve_from_distance(arr, distance_m, mode=mode,
                                              pitch_mm=pitch, min_caps=floor)
     raise HTTPException(400, "provide either size_mm or distance_m")
+
+
+_CRITIQUE: dict[tuple, dict] = {}
+
+
+@app.get("/critique")
+def critique(image_id: str, mode: str = "picture", pitch_mm: float = 32.0) -> dict:
+    """Heuristic 'is this a good cap-art image?' score + tips + recommended settings."""
+    img = _get(image_id)
+    key = (image_id, mode)
+    if key not in _CRITIQUE:
+        _CRITIQUE[key] = critique_mod.critique(
+            np.asarray(img.convert("RGB")), mode=mode, pitch_mm=pitch_mm)
+    return _CRITIQUE[key]
 
 
 @app.get("/estimate")
