@@ -28,6 +28,7 @@ import cv2
 
 from ..data.store import CapDataset, FrameRecord
 from .cap_color import median_rgb, mosaic_rgb_from_crop
+from .cap_signature import MODEL_NAME, cap_signature
 from ..vision.card_reader import (
     SPREAD_REJECT_DE,
     cap_present,
@@ -112,6 +113,7 @@ def main(argv: list[str] | None = None) -> None:
         fields: list[tuple[int, int, int]] = []
         marks: list[float] = []
         mosaics: list[tuple[int, int, int]] = []
+        sigs: list = []
         for fk in range(args.frames_per_cap):
             ok2, b2 = cap.read()
             if not ok2:
@@ -129,6 +131,7 @@ def main(argv: list[str] | None = None) -> None:
             cv2.imwrite(str(path), png)
             # at-distance colour: linear-light mean of the whole face (logo mixed in)
             mosaics.append(mosaic_rgb_from_crop(crop))
+            sigs.append(cap_signature(crop))  # rotation-invariant re-ID fingerprint
             # the cap's true colour for this frame: dominant field, logo excluded
             fld = read_cap_field(wb, h2)
             col_f = fld[0] if fld else None
@@ -161,8 +164,24 @@ def main(argv: list[str] | None = None) -> None:
         marking = _median(marks) if marks else None
         mosaic = median_rgb(mosaics) if mosaics else None
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        db.add_cap(color, frames, captured_at=now, source="card_capture",
-                   marking_frac=marking, mosaic_rgb=mosaic)
+        cap_id = db.add_cap(color, frames, captured_at=now, source="card_capture",
+                            marking_frac=marking, mosaic_rgb=mosaic)
+        if sigs:
+            import numpy as _np
+
+            sig = _np.median(_np.stack(sigs), axis=0).astype(_np.float32)
+            db.add_embedding(cap_id, MODEL_NAME, sig.tolist(), created_at=now)
+            # re-ID hint (warn-only): does this look like a cap already scanned?
+            try:
+                from .similar import similar_caps
+
+                ranked = similar_caps(db, cap_id, k=1)
+                if ranked:
+                    near_id, score = ranked[0]
+                    tag = "likely SAME design as" if score < 0.8 else "closest existing:"
+                    print(f"    ~ {tag} cap #{near_id} (score {score:.2f})", flush=True)
+            except Exception:  # noqa: BLE001 - a hint must never break capture
+                pass
         threading.Thread(target=_ding, daemon=True).start()
         flash_msg, flash_color = f"SAVED #{idx}", (60, 235, 90)
         flash_until = time.time() + 0.8
