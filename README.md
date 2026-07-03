@@ -28,6 +28,35 @@ and the inventory can be browsed by visual similarity:
 
 ![caps ranked by similarity to a query cap](docs/images/similar-caps.png)
 
+## From any image to a buildable mosaic
+
+The **Mosaic Estimator** web app (`PYTHONPATH=src python -m cap_mosaic.app.webapp`,
+then http://127.0.0.1:8000/) takes any image — even one you just generated with
+an LLM — and turns it into a physically buildable cap plan:
+
+![generate → AI simplify → caps up close → reads from afar](docs/images/pipeline-lion.jpg)
+
+Everything happens in one screen: drop/paste an image, drag the **size** and
+**viewing-distance** sliders, and watch the piece as caps up close vs a picture
+from afar (perceptually correct: the mosaic *shrinks and stays sharp*, colours
+mix in linear light — no fake blur):
+
+![the estimator: judge, simulation, BOM, cap map](docs/images/app-ui.jpg)
+
+Highlights (full walkthrough in **[docs/GUIDE.md](docs/GUIDE.md)**):
+
+- **AI judge + one-click fixes** — a heuristic + Qwen-vision judge scores the
+  image for cap-art suitability; `🪄 AI fix` applies its recommended settings
+  (colours, thicken, size…), `🎨 AI simplify` rewrites the image itself into
+  flat, thick-lined, cap-friendly art:
+
+  ![before and after AI simplify](docs/images/ai-simplify.jpg)
+- **Build artifacts** — a printable paint-by-numbers **cap map** (PDF), a
+  per-colour BOM with *have/short* from your scanned inventory, and projector
+  **stencil / one-colour-at-a-time** modes for the physical build:
+
+  ![paint-by-numbers cap map](docs/images/capmap-sample.png)
+
 ## Why this might be original
 
 The mosaic-*generation* problem is well-solved (academic "structure-aware bottle
@@ -60,6 +89,7 @@ this project. Details in `docs/PRIOR_ART.md`.
 
 ## Docs
 
+- `docs/GUIDE.md` — **start here as a user:** the full illustrated guide — design, judge, simulate, print, project, build.
 - `docs/RIG_SETUP.md` — **start here for the build:** boxes → calibration → live loop, with diagrams.
 - `docs/PRIOR_ART.md` — what exists, what's novel.
 - `docs/ARCHITECTURE.md` — components, data flow, the portable-core split, math.
