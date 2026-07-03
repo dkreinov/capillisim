@@ -25,8 +25,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import cv2
+import numpy as np
 
-from ..data.store import CapDataset, FrameRecord
+from ..data.store import CapDataset, FrameRecord, size_class_of
 from .cap_color import median_rgb, mosaic_rgb_from_crop
 from .cap_signature import MODEL_NAME, cap_signature
 from ..vision.card_reader import (
@@ -75,6 +76,62 @@ def _ding():
         pass
 
 
+# --- recent-caps strip: last N scans shown under the preview so the user sees
+# --- what was just added (and what Z removed) without leaving the scanner.
+RECENT_N = 5
+_TILE = 56           # thumbnail side (px)
+_STRIP_H = _TILE + 26
+_FONT = cv2.FONT_HERSHEY_SIMPLEX
+
+
+def _thumb(img_bgr) -> "np.ndarray":
+    """Square BGR thumbnail; gray placeholder when the crop can't be read."""
+    if img_bgr is None or getattr(img_bgr, "size", 0) == 0:
+        return np.full((_TILE, _TILE, 3), 70, np.uint8)
+    return cv2.resize(img_bgr, (_TILE, _TILE))
+
+
+def _size_letter(size_class: str | None) -> str:
+    return {"standard-26": "S", "large-38": "L", "other": "?"}.get(size_class or "", "")
+
+
+def render_recent_strip(entries: list[dict], width: int = 640) -> "np.ndarray":
+    """Draw the last RECENT_N scans as a strip: thumb + '#id' (+ size letter).
+
+    A deleted (Z-undone) entry stays visible with a red X and 'DEL' so the user
+    sees both what was added and what was removed.
+    """
+    strip = np.full((_STRIP_H, width, 3), 24, np.uint8)
+    cv2.putText(strip, "last", (8, 26), _FONT, 0.45, (170, 170, 170), 1)
+    cv2.putText(strip, "scans", (8, 44), _FONT, 0.45, (170, 170, 170), 1)
+    x = 62
+    for e in entries[-RECENT_N:]:
+        strip[4:4 + _TILE, x:x + _TILE] = e["thumb"]
+        if e.get("deleted"):
+            cv2.line(strip, (x, 4), (x + _TILE, 4 + _TILE), (60, 60, 235), 3)
+            cv2.line(strip, (x + _TILE, 4), (x, 4 + _TILE), (60, 60, 235), 3)
+            label, col = f"#{e['id']} DEL", (60, 60, 235)
+        else:
+            letter = _size_letter(e.get("size"))
+            label = f"#{e['id']}" + (f" {letter}" if letter else "")
+            col = (60, 235, 90)
+        cv2.putText(strip, label, (x, _STRIP_H - 7), _FONT, 0.42, col, 1)
+        x += _TILE + 14
+        if x + _TILE > width:
+            break
+    return strip
+
+
+def recent_entries_from_db(db: CapDataset, n: int = RECENT_N) -> list[dict]:
+    """Seed the strip from the DB so a restarted scanner still shows history."""
+    entries: list[dict] = []
+    for c in db.caps(with_frames=True)[-n:]:
+        img = cv2.imread(c.frames[0].path) if c.frames else None
+        entries.append({"id": c.id, "thumb": _thumb(img),
+                        "size": c.size_class, "deleted": False})
+    return entries
+
+
 def _next_index(crops_dir: Path) -> int:
     existing = list(crops_dir.glob("cap_*_f0.png"))
     if not existing:
@@ -99,6 +156,7 @@ def main(argv: list[str] | None = None) -> None:
     crops.mkdir(parents=True, exist_ok=True)
     db = CapDataset(out / "caps.db")
     idx = _next_index(crops)
+    recent = recent_entries_from_db(db)
 
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
     if not cap.isOpened():
@@ -209,11 +267,13 @@ def main(argv: list[str] | None = None) -> None:
         amb = "  AMBIGUOUS-FIELD" if (marking or 0) >= 0.40 else ""
         size = ""
         if diameter is not None:
-            from ..data.store import size_class_of
-
             size = f"  Ø{diameter:.1f}mm {size_class_of(diameter)}"
         print(f"  saved cap #{idx}: {len(frames)} crops  field{color}  "
               f"mosaic{mosaic}{size}{busy}{amb}", flush=True)
+        recent.append({"id": cap_id,
+                       "thumb": _thumb(cv2.imread(frames[0].path) if frames else None),
+                       "size": size_class_of(diameter), "deleted": False})
+        del recent[:-(RECENT_N + 3)]  # keep a little slack so DELs stay visible
         idx += 1
         return True
 
@@ -266,7 +326,7 @@ def main(argv: list[str] | None = None) -> None:
             if time.time() < flash_until:  # SAVED (green) / REJECTED (red) flash
                 cv2.rectangle(preview, (3, 3), (637, 357), flash_color, 6)
                 cv2.putText(preview, flash_msg, (150, 195), FONT, 1.1, flash_color, 3)
-            cv2.imshow("cap capture", preview)
+            cv2.imshow("cap capture", np.vstack([preview, render_recent_strip(recent, preview.shape[1])]))
             k = cv2.waitKey(30) & 0xFF
             if k in (ord("q"), 27):
                 break
@@ -277,6 +337,9 @@ def main(argv: list[str] | None = None) -> None:
                 if last is not None and db.delete_cap(last):
                     idx = _next_index(crops)
                     captured = False
+                    for e in recent:
+                        if e["id"] == last:
+                            e["deleted"] = True
                     flash_msg, flash_until = f"REMOVED #{last}", time.time() + 0.8
                     print(f"  removed cap #{last}", flush=True)
     finally:
