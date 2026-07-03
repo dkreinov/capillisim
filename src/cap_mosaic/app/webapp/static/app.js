@@ -66,7 +66,8 @@ async function upload(file) {
   const r = await fetch("/upload", { method: "POST", body: fd });
   if (!r.ok) { alert("upload failed"); return; }
   const b = await r.json();
-  dz.querySelector("p").innerHTML = `loaded ${b.width}×${b.height}<br/><small>drop another to replace</small>`;
+  dz.querySelector("p").innerHTML = `loaded ${b.width}×${b.height} <small>· drop / paste another to replace</small>`;
+  dz.classList.add("slim");
   versions = [];  // a fresh upload starts a fresh version history
   addVersion(b, "Original");
   $("origwrap").hidden = false;
@@ -357,6 +358,14 @@ async function refresh() {
   $("simhint").textContent =
     `${(sizeMm() / 1000).toFixed(2)} m wide, seen from ${distM().toFixed(1)} m — ${pct} · ${readQuality(distM())}`;
 }
+
+// Show how many caps the scanned inventory holds (feeds the "My scanned caps" group).
+(async function loadCapsCount() {
+  try {
+    const b = await (await fetch("/caps_count")).json();
+    $("capsCount").textContent = `(${b.count} scanned)`;
+  } catch (_) { /* leave blank */ }
+})();
 
 // Load a sample image on first open so creators see the app working immediately.
 (async function loadSample() {

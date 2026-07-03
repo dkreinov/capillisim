@@ -155,6 +155,16 @@ def _solve(img: Image.Image, image_id: str, mode: str, pitch: float,
     raise HTTPException(400, "provide either size_mm or distance_m")
 
 
+@app.get("/caps_count")
+def caps_count() -> dict:
+    """How many caps are in the scanned inventory (0 when caps.db is absent)."""
+    if not _DB.exists():
+        return {"count": 0}
+    from ..planner_designer import load_inventory
+
+    return {"count": len(load_inventory(str(_DB)))}
+
+
 _CRITIQUE: dict[tuple, dict] = {}
 _LLM_CRITIQUE: dict[str, dict] = {}
 

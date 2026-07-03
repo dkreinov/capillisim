@@ -168,6 +168,20 @@ def test_simulate_accepts_board_colour_and_real_only():
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
 
 
+def test_caps_count_reports_inventory_size(tmp_path, monkeypatch):
+    from cap_mosaic.app.webapp import server
+    from cap_mosaic.data.store import CapDataset
+
+    dbp = tmp_path / "caps.db"
+    with CapDataset(dbp) as db:
+        for i in range(5):
+            db.add_cap((10 * i, 20, 30), captured_at="t")
+    monkeypatch.setattr(server, "_DB", dbp)
+    assert client.get("/caps_count").json() == {"count": 5}
+    monkeypatch.setattr(server, "_DB", tmp_path / "missing.db")
+    assert client.get("/caps_count").json() == {"count": 0}
+
+
 def test_inventory_report_have_need_short(tmp_path, monkeypatch):
     from cap_mosaic.app.webapp import server
     from cap_mosaic.data.store import CapDataset

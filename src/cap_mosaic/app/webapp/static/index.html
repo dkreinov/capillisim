@@ -34,44 +34,56 @@
       </div>
 
       <div class="controls" id="controls" hidden>
-        <div class="mode">
-          <label><input type="radio" name="mode" value="picture" checked /> Picture</label>
-          <label><input type="radio" name="mode" value="pattern" /> Pattern</label>
+
+        <div class="group">
+          <div class="ghead">Piece — how big, seen from where</div>
+          <div class="mode">
+            <label><input type="radio" name="mode" value="picture" checked /> Picture</label>
+            <label><input type="radio" name="mode" value="pattern" /> Pattern</label>
+          </div>
+          <label class="slider">Size (width): <b id="sizeVal">2.5 m</b>
+            <input id="size" type="range" min="200" max="12000" step="50" value="2500" />
+          </label>
+          <label class="slider">Viewing distance: <b id="distVal">6.0 m</b>
+            <input id="dist" type="range" min="0.5" max="40" step="0.5" value="6" />
+          </label>
+          <div class="solvers">
+            <button id="fitSize" title="Set the size so the piece fills a comfortable view from the current distance">↳ size for this distance</button>
+            <button id="fitDist" title="Set the distance recommended for the current size">↳ distance for this size</button>
+            <button id="fitMin" title="Smallest size that still reads, and the closest you can stand">↳ minimal size</button>
+          </div>
         </div>
 
-        <div class="palette">
-          <label>Palette:
-            <select id="preset">
-              <option value="">Auto (from image)</option>
-              <option value="portrait">Portrait (6 tones)</option>
-              <option value="sunset">Sunset</option>
-              <option value="space">Space</option>
-            </select>
-          </label>
-          <label>Colours:
-            <input type="number" id="colorsN" min="4" max="24" step="1" value="12" title="palette size — fewer colours read bolder" />
-          </label>
-          <label class="chk"><input type="checkbox" id="dither" checked /> Dither</label>
-          <label class="chk"><input type="checkbox" id="thicken" /> Thicken outlines</label>
-          <label class="chk"><input type="checkbox" id="realOnly" /> Real caps only</label>
-          <label class="chk"><input type="checkbox" id="useInv" /> Use my caps</label>
-          <label>Board:
-            <input type="color" id="bgColor" value="#3c2d23" title="backing board colour (wood / paper / paint)" />
-          </label>
-          <a id="palcmp" class="capmaplink" target="_blank" rel="noopener" style="float:none">⇆ Compare palettes</a>
+        <div class="group">
+          <div class="ghead">Style — palette &amp; rendering</div>
+          <div class="palette">
+            <label>Palette:
+              <select id="preset">
+                <option value="">Auto (from image)</option>
+                <option value="portrait">Portrait (6 tones)</option>
+                <option value="sunset">Sunset</option>
+                <option value="space">Space</option>
+              </select>
+            </label>
+            <label>Colours:
+              <input type="number" id="colorsN" min="4" max="24" step="1" value="12" title="palette size — fewer colours read bolder" />
+            </label>
+            <label class="chk" title="blend gradients from few colours by mixing adjacent caps"><input type="checkbox" id="dither" checked /> Dither</label>
+            <label class="chk" title="widen 1-cap-thin lines (eyes, whiskers) so they survive at distance"><input type="checkbox" id="thicken" /> Thicken outlines</label>
+            <label>Board:
+              <input type="color" id="bgColor" value="#3c2d23" title="backing board colour (wood / paper / paint) — shows in the gaps between caps" />
+            </label>
+            <a id="palcmp" class="capmaplink" target="_blank" rel="noopener" style="float:none">⇆ Compare palettes</a>
+          </div>
         </div>
 
-        <label class="slider">Size (width): <b id="sizeVal">2.5 m</b>
-          <input id="size" type="range" min="200" max="12000" step="50" value="2500" />
-        </label>
-        <label class="slider">Viewing distance: <b id="distVal">6.0 m</b>
-          <input id="dist" type="range" min="0.5" max="40" step="0.5" value="6" />
-        </label>
-
-        <div class="solvers">
-          <button id="fitSize">↳ size for this distance</button>
-          <button id="fitDist">↳ distance for this size</button>
-          <button id="fitMin" title="Smallest size that still reads, and the closest you can stand">↳ minimal size</button>
+        <div class="group">
+          <div class="ghead">My scanned caps <span id="capsCount"></span></div>
+          <div class="palette">
+            <label class="chk" title="add have/short columns to the caps-by-colour list: how many of each colour you already own"><input type="checkbox" id="useInv" /> Shopping list (have / short per colour)</label>
+            <label class="chk" title="draw the simulation using photos of your scanned caps instead of generated ones"><input type="checkbox" id="realOnly" /> Render using my caps' photos</label>
+          </div>
+          <small class="ghint">Scan caps with the reading card to grow this inventory.</small>
         </div>
       </div>
     </section>
