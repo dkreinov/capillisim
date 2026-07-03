@@ -61,3 +61,15 @@ def test_skipped_caps_are_not_placed():
     assert stats.placed == 1
     assert stats.skipped == 1
     assert session.plan.filled_count == 1
+
+
+def test_matcher_inventory_from_db_pairs_field_and_mosaic(tmp_path):
+    from cap_mosaic.app.build_loop import matcher_inventory_from_db
+    from cap_mosaic.data.store import CapDataset
+
+    with CapDataset(tmp_path / "caps.db") as db:
+        db.add_cap((178, 171, 153), captured_at="t", mosaic_rgb=(149, 142, 128))
+        db.add_cap((200, 30, 30), captured_at="t")  # legacy: no mosaic yet
+    inv = matcher_inventory_from_db(tmp_path / "caps.db")
+    assert (inv[0].field, inv[0].mosaic) == ((178, 171, 153), (149, 142, 128))
+    assert (inv[1].field, inv[1].mosaic) == ((200, 30, 30), (200, 30, 30))  # fallback

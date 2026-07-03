@@ -6,6 +6,12 @@ this piece and is rejected ("set aside"). This is the greedy strategy suited to
 an open-ended, partial cap supply; scarcity-aware assignment (don't spend a rare
 color on a cell a common cap could fill) is a later enhancement.
 
+Identify-then-place: a cap has two colours — the *field* (dominant body colour,
+what a live camera read produces) and the *mosaic* (its at-distance contribution,
+what plan slots are matched against). With an ``inventory``, ``match_cap`` first
+identifies which known cap the field read is (the key), then places by that
+cap's mosaic colour (the value). Without one, it behaves like plain ``match``.
+
 Pure core: no camera, no projector.
 """
 
@@ -19,6 +25,17 @@ from .plan import GridPlan, PlannedCell
 # CIEDE2000 above which a cap is considered not worth placing. ~25 keeps obvious
 # matches and rejects clearly-wrong colors; tune against real caps later.
 DEFAULT_REJECT_THRESHOLD = 25.0
+# CIEDE2000 within which a live field read counts as one of the known inventory
+# caps; farther reads are treated as an unknown cap (use the raw read as-is).
+DEFAULT_IDENTIFY_THRESHOLD = 10.0
+
+
+@dataclass(frozen=True)
+class InventoryCap:
+    """A known cap: field colour = recognition key, mosaic = placement colour."""
+
+    field: RGB
+    mosaic: RGB
 
 
 @dataclass
@@ -29,9 +46,35 @@ class Match:
 
 
 class Matcher:
-    def __init__(self, plan: GridPlan, reject_threshold: float = DEFAULT_REJECT_THRESHOLD):
+    def __init__(
+        self,
+        plan: GridPlan,
+        reject_threshold: float = DEFAULT_REJECT_THRESHOLD,
+        inventory: tuple[InventoryCap, ...] | None = None,
+        identify_threshold: float = DEFAULT_IDENTIFY_THRESHOLD,
+    ):
         self.plan = plan
         self.reject_threshold = reject_threshold
+        self.inventory = inventory or ()
+        self.identify_threshold = identify_threshold
+
+    def resolve(self, field_rgb: RGB) -> RGB:
+        """The colour to place by: the identified cap's mosaic, or the raw read.
+
+        A busy cap's field colour (e.g. a muddy beige from a white+green+red cap)
+        is a stable *key*, not what the cap looks like from distance — placing by
+        it puts the cap in the wrong slot. Identify the cap first, then use its
+        mosaic colour. Unknown caps (no close inventory field) keep the raw read.
+        """
+        if not self.inventory:
+            return field_rgb
+        best = min(self.inventory, key=lambda c: distance(field_rgb, CapColor("", c.field)))
+        d = distance(field_rgb, CapColor("", best.field))
+        return best.mosaic if d <= self.identify_threshold else field_rgb
+
+    def match_cap(self, field_rgb: RGB) -> Match:
+        """Identify the cap from its live field read, then match by its mosaic."""
+        return self.match(self.resolve(field_rgb))
 
     def match(self, rgb: RGB) -> Match:
         """Best empty cell for a cap of color `rgb`, or a rejection."""

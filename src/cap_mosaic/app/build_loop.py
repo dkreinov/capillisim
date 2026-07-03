@@ -15,11 +15,25 @@ from typing import Callable, Optional
 
 from PIL import Image
 
-from ..core.matcher import Match, Matcher
+from ..core.matcher import InventoryCap, Match, Matcher
 from ..core.plan import GridPlan
 from ..procam.calibrate import Calibration
 from ..procam.render import render_projection
 from ..vision.cap_reader import read_dominant_color
+
+
+def matcher_inventory_from_db(path) -> tuple[InventoryCap, ...]:
+    """Load (field, mosaic) pairs from caps.db for identify-then-place matching.
+
+    Legacy rows without a mosaic colour use the field for both (flat-cap
+    behaviour); run ``app.backfill_mosaic`` to fill them properly.
+    """
+    from ..data.store import CapDataset
+
+    with CapDataset(path) as db:
+        return tuple(
+            InventoryCap(field=c.rgb, mosaic=c.mosaic_rgb or c.rgb) for c in db.caps()
+        )
 
 CapSource = Callable[[], Optional[Image.Image]]  # returns a frame, or None to stop
 Display = Callable[[Image.Image], None]  # show a projector frame
@@ -41,15 +55,26 @@ class BuildStats:
 class BuildSession:
     """Holds the live state and turns frames into matches + projector frames."""
 
-    def __init__(self, plan: GridPlan, cal: Calibration, reject_threshold: float | None = None):
+    def __init__(
+        self,
+        plan: GridPlan,
+        cal: Calibration,
+        reject_threshold: float | None = None,
+        inventory: tuple[InventoryCap, ...] | None = None,
+    ):
         self.plan = plan
         self.cal = cal
+        kwargs = {"inventory": inventory} if inventory else {}
         self.matcher = (
-            Matcher(plan, reject_threshold) if reject_threshold is not None else Matcher(plan)
+            Matcher(plan, reject_threshold, **kwargs)
+            if reject_threshold is not None
+            else Matcher(plan, **kwargs)
         )
 
     def recognize_and_match(self, frame: Image.Image) -> Match:
-        return self.matcher.match(read_dominant_color(frame))
+        # identify-then-place: the live read is a FIELD colour (recognition key);
+        # with an inventory the matcher places by the identified cap's MOSAIC.
+        return self.matcher.match_cap(read_dominant_color(frame))
 
     def projection(self, highlight=None) -> Image.Image:
         return render_projection(self.plan, self.cal, highlight=highlight)
