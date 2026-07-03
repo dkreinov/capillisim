@@ -17,6 +17,21 @@ main { display:grid; grid-template-columns:340px 1fr; gap:20px; padding:18px 26p
 .croptools { margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .croptools small { color:var(--mut); margin-right:auto; }
 .croptools button { padding:4px 10px; }
+
+.versionswrap { margin-top:10px; }
+.versionswrap .vhead { color:var(--mut); font-size:12px; margin-bottom:6px; }
+.versions { display:flex; gap:8px; flex-wrap:wrap; }
+.vtile { position:relative; width:86px; cursor:pointer; border:2px solid #333a49; border-radius:10px;
+  padding:4px; background:var(--panel); text-align:center; transition:border-color .12s; }
+.vtile:hover { border-color:#5b6785; }
+.vtile.active { border-color:var(--acc); }
+.vtile img { width:100%; height:58px; object-fit:cover; border-radius:6px; display:block; }
+.vtile .vlabel { display:block; font-size:11px; color:var(--mut); margin-top:3px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.vtile.active .vlabel { color:var(--ink); }
+.vtile .vsave { position:absolute; top:6px; right:6px; background:#141a26dd; color:#6cf; font-size:12px;
+  border-radius:6px; padding:0 5px; text-decoration:none; border:1px solid #39445a; }
+.vtile .vsave:hover { color:#fff; border-color:#6cf; }
 .palette { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:12px; color:var(--mut); }
 .palette .chk { display:flex; align-items:center; gap:5px; }
 .palette input[type=color] { width:34px; height:22px; padding:0; border:1px solid #333a49; background:none; }

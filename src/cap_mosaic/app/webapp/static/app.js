@@ -4,8 +4,7 @@ const PITCH = 32; // mm
 const ARCMIN = 3437.75;
 
 let imageId = null;
-let originalId = null;
-let originalAspect = 1;
+let versions = [];  // [{id, label, aspect}] — Original, crops, AI edits; imageId = active
 let aspect = 1;
 let selFrac = null;  // {x0,y0,x1,y1} in image fractions
 let highlight = null;  // BOM colour being isolated (hex), or null
@@ -67,21 +66,54 @@ async function upload(file) {
   const r = await fetch("/upload", { method: "POST", body: fd });
   if (!r.ok) { alert("upload failed"); return; }
   const b = await r.json();
-  imageId = originalId = b.id;
-  aspect = originalAspect = b.aspect;
   dz.querySelector("p").innerHTML = `loaded ${b.width}×${b.height}<br/><small>drop another to replace</small>`;
-  setPreview(b.id);
-  clearSelection();
+  versions = [];  // a fresh upload starts a fresh version history
+  addVersion(b, "Original");
   $("origwrap").hidden = false;
   $("croptools").hidden = false;
+  $("versionswrap").hidden = false;
   $("controls").hidden = false;
   $("stats").hidden = false;
   $("bomwrap").hidden = false;
-  refresh();
-  loadCritique();
 }
 
 function setPreview(id) { $("orig").src = "/image?image_id=" + id + "&_=" + Date.now(); }
+
+// --- image versions: Original, crops, AI edits — switch and save any of them ---
+function addVersion(b, kind) {
+  const n = versions.filter((v) => v.label.startsWith(kind)).length;
+  const label = n === 0 ? kind : `${kind} ${n + 1}`;
+  versions.push({ id: b.id, label, aspect: b.aspect });
+  renderVersions();
+  activateVersion(b.id);
+}
+
+function activateVersion(id) {
+  const v = versions.find((x) => x.id === id);
+  if (!v) return;
+  imageId = v.id; aspect = v.aspect;
+  highlight = null;              // isolate/selection state belongs to the old plan
+  setPreview(v.id); clearSelection();
+  renderVersions();
+  refresh(); loadCritique();     // loadCritique also clears the stale AI verdict
+}
+
+function renderVersions() {
+  const box = $("versions"); box.innerHTML = "";
+  for (const v of versions) {
+    const tile = document.createElement("div");
+    tile.className = "vtile" + (v.id === imageId ? " active" : "");
+    tile.innerHTML =
+      `<img src="/image?image_id=${v.id}" alt="${v.label}" loading="lazy" />` +
+      `<span class="vlabel">${v.label}</span>` +
+      `<a class="vsave" href="/image?image_id=${v.id}" download="${v.label.toLowerCase().replace(/ /g, "-")}.png" title="save this version">⬇</a>`;
+    tile.addEventListener("click", (e) => {
+      if (e.target.closest(".vsave")) return;  // the save link downloads, not switches
+      activateVersion(v.id);
+    });
+    box.appendChild(tile);
+  }
+}
 
 let lastRec = null;
 async function loadCritique() {
@@ -156,12 +188,8 @@ $("aiSimplify").addEventListener("click", async () => {
   box.hidden = false; box.textContent = "AI is simplifying the image… (can take ~20s)";
   const r = await fetch("/simplify?" + new URLSearchParams({ image_id: imageId }));
   if (!r.ok) { box.textContent = "AI simplify failed (" + r.status + ")"; return; }
-  const b = await r.json();
-  // switch to the simplified image; the original stays via ↺ Full image
-  imageId = b.id; aspect = b.aspect;
-  setPreview(b.id); clearSelection();
-  box.textContent = "🎨 simplified — showing the AI-edited version; ↺ Full image restores the original.";
-  refresh(); loadCritique();
+  // becomes a new version; every earlier version stays one click away in the strip
+  addVersion(await r.json(), "AI simplified");
 });
 
 $("applyRec").addEventListener("click", () => {
@@ -237,16 +265,7 @@ $("cropBtn").addEventListener("click", async () => {
   const q = new URLSearchParams({ image_id: imageId, ...selFrac });
   const r = await fetch("/crop?" + q.toString());
   if (!r.ok) { alert("crop failed"); return; }
-  const b = await r.json();
-  imageId = b.id; aspect = b.aspect;
-  setPreview(b.id); clearSelection();
-  refresh(); loadCritique();
-});
-
-$("resetImg").addEventListener("click", () => {
-  imageId = originalId; aspect = originalAspect;
-  setPreview(originalId); clearSelection();
-  refresh(); loadCritique();
+  addVersion(await r.json(), "Crop");
 });
 
 $("fitSize").addEventListener("click", async () => {
