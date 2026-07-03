@@ -29,10 +29,52 @@ _RUBRIC = (
     "Good subjects: bold silhouette, high contrast, few colours (4-8 families), "
     "simple background, iconic/recognizable at low resolution. Bad: fine detail, "
     "low contrast, busy background, many similar shades, small faces.\n"
+    "You may also recommend machine-applicable settings via \"actions\": "
+    "{\"set\": \"colors\", \"value\": 4-24 int (palette size — fewer for bolder "
+    "art)}, {\"set\": \"thicken\", \"value\": bool (widen ~1-cap-thin lines)}, "
+    "{\"set\": \"dither\", \"value\": bool (blend gradients from few colours)}, "
+    "{\"set\": \"size_m\", \"value\": physical width in metres 0.2-12 (bigger = "
+    "more caps = more detail)}, {\"set\": \"preset\", \"value\": one of "
+    "\"portrait\"|\"sunset\"|\"space\"|\"\" (curated palette; \"\" = auto)}.\n"
     "Reply with ONLY strict JSON: {\"score\": 0-100, \"verdict\": one of "
     "\"great\"|\"good\"|\"tricky\"|\"poor\", \"tips\": [2-4 short actionable "
-    "strings for THIS image], \"better_subject\": one short suggestion or \"\"}."
+    "strings for THIS image], \"better_subject\": one short suggestion or \"\", "
+    "\"actions\": [0-5 of the settings above that would improve THIS image]}."
 )
+
+# The judge may only touch knobs we own — everything else is dropped.
+_KNOBS = {
+    "colors": ("int", 4, 24),
+    "thicken": ("bool", None, None),
+    "dither": ("bool", None, None),
+    "size_m": ("float", 0.2, 12.0),
+    "preset": ("enum", ("", "portrait", "sunset", "space"), None),
+}
+
+
+def _clean_actions(raw) -> list[dict]:
+    """Validate LLM-proposed actions against the knob whitelist (one per knob)."""
+    out: dict[str, dict] = {}
+    for a in raw if isinstance(raw, list) else []:
+        knob = a.get("set") if isinstance(a, dict) else None
+        if knob not in _KNOBS:
+            continue
+        kind, lo, hi = _KNOBS[knob]
+        v = a.get("value")
+        try:
+            if kind == "int":
+                v = max(lo, min(hi, int(v)))
+            elif kind == "float":
+                v = max(lo, min(hi, float(v)))
+            elif kind == "bool":
+                v = v if isinstance(v, bool) else str(v).strip().lower() in ("true", "1", "yes")
+            elif kind == "enum":
+                if v not in lo:
+                    continue
+        except (TypeError, ValueError):
+            continue
+        out[knob] = {"set": knob, "value": v}  # last valid one per knob wins
+    return list(out.values())
 
 
 def _load_key() -> str:
@@ -96,5 +138,6 @@ def qwen_judge(
     out = _extract_json(text)
     out.setdefault("tips", [])
     out.setdefault("better_subject", "")
+    out["actions"] = _clean_actions(out.get("actions"))
     out["model"] = model
     return out

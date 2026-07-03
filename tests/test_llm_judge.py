@@ -40,6 +40,38 @@ def test_parses_json_inside_code_fence():
     assert r["score"] == 40 and r["verdict"] == "tricky"
 
 
+def test_actions_are_whitelisted_and_normalized():
+    reply = json.dumps({
+        "score": 70, "verdict": "good", "tips": ["t"],
+        "actions": [
+            {"set": "colors", "value": 6},            # valid
+            {"set": "colors", "value": 99},           # out of range -> clamped
+            {"set": "thicken", "value": True},        # valid bool
+            {"set": "dither", "value": "true"},       # stringy bool -> coerced
+            {"set": "size_m", "value": 3.2},          # valid float
+            {"set": "preset", "value": "space"},      # valid enum
+            {"set": "preset", "value": "neon"},       # bad enum -> dropped
+            {"set": "rm_rf", "value": "/"},           # unknown knob -> dropped
+        ],
+    })
+    r = llm_judge.qwen_judge(_img(), key="k", post=_fake_post({}, reply))
+    got = {(a["set"], a["value"]) for a in r["actions"]}
+    assert ("colors", 24) in got            # one action per knob, last wins; 99 clamped
+    assert ("thicken", True) in got
+    assert ("dither", True) in got          # stringy bool coerced
+    assert ("size_m", 3.2) in got
+    assert ("preset", "space") in got       # the invalid "neon" was dropped
+    sets = [a["set"] for a in r["actions"]]
+    assert "rm_rf" not in sets
+    assert sets.count("colors") == 1 and sets.count("preset") == 1
+
+
+def test_missing_actions_defaults_to_empty_list():
+    reply = json.dumps({"score": 50, "verdict": "good", "tips": ["t"]})
+    r = llm_judge.qwen_judge(_img(), key="k", post=_fake_post({}, reply))
+    assert r["actions"] == []
+
+
 def test_missing_key_raises_clear_error(monkeypatch):
     monkeypatch.delenv("QWEEN_KEY", raising=False)
     monkeypatch.setattr(llm_judge, "_ENV_FILE", "nonexistent-env-file")
