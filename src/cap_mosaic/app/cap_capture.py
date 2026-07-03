@@ -209,10 +209,9 @@ def main(argv: list[str] | None = None) -> None:
         amb = "  AMBIGUOUS-FIELD" if (marking or 0) >= 0.40 else ""
         size = ""
         if diameter is not None:
-            cls = next((n for mm, n in ((26.0, "crown-26"), (29.0, "crown-29"),
-                                        (38.0, "large-38")) if abs(diameter - mm) <= 1.5),
-                       "other")
-            size = f"  Ø{diameter:.1f}mm {cls}"
+            from ..data.store import size_class_of
+
+            size = f"  Ø{diameter:.1f}mm {size_class_of(diameter)}"
         print(f"  saved cap #{idx}: {len(frames)} crops  field{color}  "
               f"mosaic{mosaic}{size}{busy}{amb}", flush=True)
         idx += 1

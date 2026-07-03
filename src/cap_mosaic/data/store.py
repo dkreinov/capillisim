@@ -50,6 +50,22 @@ AMBIGUOUS_MARKING = 0.40  # marking fraction at/above which field vs logo is unc
 AMBIGUOUS_COLOR_STD = 10.0  # per-frame CIEDE2000 spread signalling an unstable read
 
 
+def size_class_of(diameter_mm: float | None) -> str | None:
+    """'standard-26' | 'large-38' | 'other', or None if unmeasured.
+
+    Sizes are of USED caps: crimping flares a nominal 26 mm crown's skirt to
+    ~29–31 mm across the teeth, so the standard class is generous. Nominal 26 vs
+    29 mm crowns are indistinguishable once flared — one class.
+    """
+    if diameter_mm is None:
+        return None
+    if diameter_mm < 33.0:
+        return "standard-26"
+    if diameter_mm >= 35.0:
+        return "large-38"
+    return "other"
+
+
 @dataclass
 class CapRecord:
     """One physical cap and its measured colour."""
@@ -71,13 +87,7 @@ class CapRecord:
 
     @property
     def size_class(self) -> str | None:
-        """'crown-26' | 'crown-29' | 'large-38' | 'other', or None if unmeasured."""
-        if self.diameter_mm is None:
-            return None
-        for mm, name in ((26.0, "crown-26"), (29.0, "crown-29"), (38.0, "large-38")):
-            if abs(self.diameter_mm - mm) <= 1.5:
-                return name
-        return "other"
+        return size_class_of(self.diameter_mm)
 
     @property
     def is_ambiguous(self) -> bool:
