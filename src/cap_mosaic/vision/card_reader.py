@@ -161,6 +161,40 @@ def _inner_circle_pixels(
     return pixels if pixels.size else None
 
 
+def measure_cap_diameter_mm(rgb: np.ndarray, h: np.ndarray) -> float | None:
+    """Physical diameter of the cap on the placement circle, in mm, or None.
+
+    The card homography is mm-true, so size falls out of geometry: take the
+    region around the placement circle at full frame resolution, mask what is
+    not card-white, erase the thin printed circle line by a morphological
+    opening scaled to ~1.5 mm, and measure the min enclosing circle of the
+    biggest remaining blob. Standard crowns read ~26 mm, large caps ~38 mm.
+    """
+    import cv2
+
+    cx0, cy0 = card_mm_to_px(h, L.CIRCLE_CX_MM, L.CIRCLE_CY_MM)
+    cx1, cy1 = card_mm_to_px(h, L.CIRCLE_CX_MM + 10.0, L.CIRCLE_CY_MM)
+    px_per_mm = float(np.hypot(cx1 - cx0, cy1 - cy0)) / 10.0
+    if px_per_mm <= 0.1:
+        return None
+    R = int(30.0 * px_per_mm)  # generous: covers caps up to ~55 mm
+    img_h, img_w = rgb.shape[:2]
+    x0, x1 = max(0, int(cx0 - R)), min(img_w, int(cx0 + R))
+    y0, y1 = max(0, int(cy0 - R)), min(img_h, int(cy0 + R))
+    if x1 - x0 < 10 or y1 - y0 < 10:
+        return None
+    roi = rgb[y0:y1, x0:x1]
+    mask = (~np.all(roi >= 215, axis=2)).astype(np.uint8) * 255
+    k = max(3, int(round(1.5 * px_per_mm)) | 1)  # odd kernel ~1.5 mm
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((k, k), np.uint8))
+    cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not cnts:
+        return None
+    (_, _), br = cv2.minEnclosingCircle(max(cnts, key=cv2.contourArea))
+    dia = 2.0 * br / px_per_mm
+    return dia if dia >= 10.0 else None  # tiny blob = noise, not a cap
+
+
 def frames_spread_de(colors: list[RGB]) -> float:
     """Largest CIEDE2000 between any frame colour and the per-channel median.
 
