@@ -1,5 +1,27 @@
 :root { --bg:#12141a; --panel:#1b1e27; --ink:#e8eaf0; --mut:#9aa1b2; --acc:#f2b705; --warn:#7a2130; }
 * { box-sizing: border-box; }
+
+/* --- buttons: one cohesive system (base + .btn-ai indigo + .btn-gold accent) --- */
+button {
+  font:inherit; font-size:13px; color:var(--ink); cursor:pointer;
+  background:linear-gradient(180deg,#2a3040,#232836);
+  border:1px solid #3b4457; border-radius:9px; padding:7px 13px;
+  box-shadow:0 1px 2px #0006, inset 0 1px 0 #ffffff10;
+  transition:border-color .12s, background .12s, box-shadow .12s, transform .05s;
+}
+button:hover:not(:disabled) { border-color:#5b6785; background:linear-gradient(180deg,#323950,#282e40); }
+button:active:not(:disabled) { transform:translateY(1px); box-shadow:0 0 1px #0006; }
+button:disabled { opacity:.45; cursor:default; }
+button:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+.btn-ai {
+  background:linear-gradient(180deg,#2e3760,#252c49);
+  border-color:#4a5892;
+}
+.btn-ai:hover:not(:disabled) { border-color:#7d8fe0; background:linear-gradient(180deg,#37437a,#2a3357);
+  box-shadow:0 1px 8px #4a58924d, inset 0 1px 0 #ffffff14; }
+.btn-gold { background:linear-gradient(180deg,#4a3c14,#37300f); border-color:#8a6d1f; color:#ffe9a8; }
+.btn-gold:hover:not(:disabled) { border-color:var(--acc); background:linear-gradient(180deg,#5a4a18,#413a12);
+  box-shadow:0 1px 8px #f2b70533, inset 0 1px 0 #ffffff14; }
 body { margin:0; font:15px/1.45 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
 header { padding:22px 26px 8px; }
 h1 { margin:0; font-size:22px; letter-spacing:.3px; }
@@ -48,8 +70,8 @@ main { display:grid; grid-template-columns:340px 1fr; gap:20px; padding:18px 26p
 .slider b { color:var(--ink); }
 .slider input { width:100%; margin-top:6px; accent-color:var(--acc); }
 .solvers { display:flex; gap:8px; margin-top:8px; }
-.solvers button { flex:1; background:#252a36; color:var(--ink); border:1px solid #333a49; border-radius:9px; padding:8px; cursor:pointer; font-size:13px; }
-.solvers button:hover { border-color:var(--acc); }
+.solvers button { flex:1; padding:8px 6px; }
+.solvers button:hover:not(:disabled) { border-color:var(--acc); }
 
 .right { min-width:0; }
 .warning { background:var(--warn); color:#ffdfe4; padding:10px 14px; border-radius:10px; margin-bottom:12px; }
@@ -70,7 +92,7 @@ main { display:grid; grid-template-columns:340px 1fr; gap:20px; padding:18px 26p
 .cscore.great { background:#4ad07a; } .cscore.good { background:#a7d84a; }
 .cscore.tricky { background:#e6b84a; } .cscore.poor { background:#e07a7a; }
 .critique .csig { color:var(--mut); font-size:12px; }
-.critique #applyRec { padding:6px 12px; cursor:pointer; }
+.critique .chead button { white-space:nowrap; }
 .ctips { margin:10px 0 0; padding-left:18px; color:#cdd6e4; font-size:13px; }
 .ctips li { margin:3px 0; }
 .cllm { margin-top:10px; padding:10px 12px; background:#141a26; border:1px solid #2b3550;

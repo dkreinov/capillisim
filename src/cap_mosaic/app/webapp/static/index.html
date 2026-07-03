@@ -25,7 +25,7 @@
       </div>
       <div id="croptools" class="croptools" hidden>
         <small>Drag on the image to select a region.</small>
-        <button id="cropBtn" disabled>✂ Crop to selection</button>
+        <button id="cropBtn" class="btn-gold" disabled>✂ Crop to selection</button>
       </div>
 
       <div id="versionswrap" class="versionswrap" hidden>
@@ -99,10 +99,10 @@
             <b id="cverdict">Cap-art check</b>
             <div id="csig" class="csig"></div>
           </div>
-          <button id="askLLM" title="ask the Qwen vision judge (needs QWEEN_KEY)">🧠 AI judge</button>
-          <button id="aiFix" title="ask the AI judge AND apply its recommended settings, with before/after">🪄 AI fix</button>
-          <button id="aiSimplify" title="AI-edit the image itself into a cap-friendly simplified version (new image; ↺ Full image restores the original)">🎨 AI simplify</button>
-          <button id="applyRec" title="apply the suggested size + toggles">✨ Apply suggestions</button>
+          <button id="askLLM" class="btn-ai" title="ask the Qwen vision judge (needs QWEEN_KEY)">🧠 AI judge</button>
+          <button id="aiFix" class="btn-ai" title="ask the AI judge AND apply its recommended settings, with before/after">🪄 AI fix</button>
+          <button id="aiSimplify" class="btn-ai" title="AI-edit the image itself into a cap-friendly simplified version — appears as a new version in the strip">🎨 AI simplify</button>
+          <button id="applyRec" class="btn-gold" title="apply the suggested size + toggles">✨ Apply suggestions</button>
         </div>
         <ul id="ctips" class="ctips"></ul>
         <div id="cllm" class="cllm" hidden></div>
