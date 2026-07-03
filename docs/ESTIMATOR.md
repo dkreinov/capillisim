@@ -66,6 +66,17 @@ the target and only reads once you stand far enough that caps blend.
 - **Inventory gap** — `Use my caps` matches your scanned `caps.db` against the
   BOM (greedy nearest, CIEDE2000 ≤ 12) and shows *have · short* per colour plus
   *you own X of Y needed*. Report only — the plan is not constrained by stock.
+- **Cap-art check + AI judge** — every upload gets a heuristic score (contrast,
+  detail floor, background simplicity) with tips and `✨ Apply suggestions`.
+  `🧠 AI judge` (Qwen `qwen3-vl-plus`, needs `QWEEN_KEY`) adds an AI verdict.
+  `🪄 AI fix` goes further: the judge returns **whitelisted actions** (colors
+  4–24, thicken, dither, size_m, preset — nothing else is accepted) which are
+  auto-applied to the controls, with a *before* snapshot kept next to the new
+  simulation for comparison.
+- **AI simplify** — `🎨 AI simplify` (qwen-image-edit-plus) edits the image
+  itself into a cap-friendly version — ≤6 flat colours, thickened lines, clutter
+  removed, same subject — using the judge's own tips as the edit instruction.
+  Stored as a NEW image; `↺ Full image` restores the original. Opt-in per click.
 
 ## Endpoints
 
@@ -80,6 +91,10 @@ the target and only reads once you stand far enough that caps blend.
   exactly like `/simulate` (for hold-to-compare)
 - `GET /capmap?image_id=&...&format=pdf|png` -> printable paint-by-numbers cap map
 - `GET /crop?image_id=&x0=&y0=&x1=&y1=` / `GET /image?image_id=` -> region crop + preview
+- `GET /critique?image_id=&llm=` -> heuristic score/tips/recommendations; with
+  `llm=true` also the Qwen verdict incl. whitelisted `actions`
+- `GET /simplify?image_id=` -> AI-edited (simplified) copy stored as a new id
+- `GET /palettes?image_id=&size_mm=` -> side-by-side preset comparison sheet
 
 ## Building from caps (projector)
 

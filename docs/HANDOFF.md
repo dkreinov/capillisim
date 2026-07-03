@@ -20,6 +20,12 @@ milestone plan and `docs/RESEARCH.md` for the dataset/technique shortlist.
 - **Hold-to-compare** original vs caps (`/target`); **printable cap map** PDF
   (`app/cap_map.py`, `/capmap`); **inventory gap** report from `caps.db`
   (have/need/short, report-only).
+- **Judges**: heuristic cap-art check (`core/critique.py`) + Qwen LLM judge
+  (`app/llm_judge.py`, `qwen3-vl-plus`, QWEEN_KEY in gitignored `.env`).
+  `🪄 AI fix` auto-applies the judge's whitelisted actions (colors/thicken/
+  dither/size_m/preset) with a before/after; `🎨 AI simplify`
+  (`app/ai_edit.py`, qwen-image-edit-plus) rewrites the image itself into a
+  cap-friendly version, stored as a new image id.
 
 **Projector build** (`procam/render.py`, `app/project_plan.py`)
 - **Stencil** (`render_stencil`): every cell lit in its cap colour at 1:1, plus a
