@@ -167,7 +167,11 @@ def main(argv: list[str] | None = None) -> None:
         flash_msg, flash_color = f"SAVED #{idx}", (60, 235, 90)
         flash_until = time.time() + 0.8
         busy = f"  busy {int(marking * 100)}%" if marking else ""
-        print(f"  saved cap #{idx}: {len(frames)} crops  rgb{color}{busy}", flush=True)
+        # near-50/50 field/marking split: the single field colour is untrustworthy
+        # (e.g. a gold+red+white cap reads "brown") — the mosaic colour still is.
+        amb = "  AMBIGUOUS-FIELD" if (marking or 0) >= 0.40 else ""
+        print(f"  saved cap #{idx}: {len(frames)} crops  field{color}  "
+              f"mosaic{mosaic}{busy}{amb}", flush=True)
         idx += 1
         return True
 
@@ -188,9 +192,17 @@ def main(argv: list[str] | None = None) -> None:
                 fld = read_cap_field(wb, h) if present else None
                 col = fld[0] if fld else None
                 if col is not None:
-                    cv2.rectangle(preview, (500, 232), (632, 348), (col[2], col[1], col[0]), -1)
-                    cv2.rectangle(preview, (500, 232), (632, 348), (255, 255, 255), 2)
-                    cv2.putText(preview, "field", (502, 226), FONT, 0.5, (255, 255, 255), 1)
+                    # two live swatches: FIELD (recognition colour) on top and
+                    # MOSAIC (what the cap looks like from distance) below.
+                    cv2.rectangle(preview, (500, 218), (632, 276), (col[2], col[1], col[0]), -1)
+                    cv2.rectangle(preview, (500, 218), (632, 276), (255, 255, 255), 2)
+                    cv2.putText(preview, "field", (502, 212), FONT, 0.5, (255, 255, 255), 1)
+                    crop_now = crop_cap(wb, h, args.size)
+                    if crop_now is not None:
+                        mz = mosaic_rgb_from_crop(crop_now)
+                        cv2.rectangle(preview, (500, 296), (632, 354), (mz[2], mz[1], mz[0]), -1)
+                        cv2.rectangle(preview, (500, 296), (632, 354), (255, 255, 255), 2)
+                        cv2.putText(preview, "mosaic (afar)", (502, 290), FONT, 0.5, (255, 255, 255), 1)
                 busy = int(fld[1] * 100) if fld else 0
                 label = "empty (no cap)" if not present else f"cap #{idx}  rgb{col}  busy {busy}%"
                 mode = "AUTO" if args.auto else "SPACE=save"

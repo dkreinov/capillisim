@@ -33,6 +33,12 @@ this project. Details in `docs/PRIOR_ART.md`.
   slot, or set aside."
 - **Recognition:** dominant color for the POC; brand/logo ID architected but
   deferred.
+- **Two colours per cap:** the *field* colour recognises a cap in hand; the
+  *mosaic* colour — the linear-light mix of the whole face, logo included — is
+  what the cap contributes to the picture from viewing distance, and is what
+  the planner matches on. Real scanned caps:
+
+  ![field vs mosaic colour of real caps](docs/images/field-vs-mosaic.png)
 - **Designer:** supports both simple patterns and photo/portrait mosaics, with a
   viewing-distance simulator to guide the trade-off.
 - **Stack:** Python + OpenCV.

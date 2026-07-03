@@ -84,6 +84,8 @@ meta           dataset-level key/value (name, calibration ref, …)
 
   Real examples from the backfilled dataset (why the two colours differ):
 
+  ![field vs mosaic colour of real caps](images/field-vs-mosaic.png)
+
   | cap | field (recognition) | mosaic (at distance) | why |
   |---|---|---|---|
   | black, small gold crest (#99) | (8, 6, 2) black | (83, 80, 59) dark bronze | gold crest + gloss mix in |
