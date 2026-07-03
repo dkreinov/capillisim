@@ -81,6 +81,18 @@ meta           dataset-level key/value (name, calibration ref, …)
   (same optics as the distance simulator). Planner and renderer match on the
   mosaic colour (`mosaic_rgb or rgb` fallback for legacy rows); backfill with
   `python -m cap_mosaic.app.backfill_mosaic --db dataset/caps.db`.
+
+  Real examples from the backfilled dataset (why the two colours differ):
+
+  | cap | field (recognition) | mosaic (at distance) | why |
+  |---|---|---|---|
+  | black, small gold crest (#99) | (8, 6, 2) black | (83, 80, 59) dark bronze | gold crest + gloss mix in |
+  | black, big gold logo (#110) | (51, 22, 14) | (99, 73, 58) warm bronze | large logo dominates the mix |
+  | silver "Norrland" (#107) | (212, 218, 216) | (197, 202, 199) | near-identical: flat cap, mosaic ≈ field |
+  | navy, pale crest (#103) | (7, 14, 65) navy | (90, 83, 85) muted gray-mauve | pale crest lifts the dark field |
+
+  A flat single-colour cap has mosaic ≈ field; the busier the cap, the more the
+  two diverge — and the mosaic value is the one the eye actually sees in the wall.
 - **Capture quality gate.** A capture whose frames disagree (CIEDE2000 spread
   above `SPREAD_REJECT_DE`) is rejected at scan time — a hand still in frame,
   a wandering reflection, or glare — instead of storing a corrupted colour.
