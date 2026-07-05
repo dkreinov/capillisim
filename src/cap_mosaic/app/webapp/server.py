@@ -180,8 +180,10 @@ def pattern(kind: str = "gradient") -> dict:
     stock = [(g.rgb, g.count) for g in load_stock(str(_DB))]
     plan = pattern_plan(kind, stock)
     palette = list({tuple(c.rgb) for c in plan.cells if not c.is_hole})
+    # every colour IS a real cap, so render from the photographed caps only —
+    # procedural fillers would muddy the pattern's structure
     lib = build_library(palette, db_path=str(_DB), size=64)
-    img = render_mosaic_caps(plan, lib, px_per_cap=22)
+    img = render_mosaic_caps(plan, lib, px_per_cap=22, real_only=True)
     _COUNTER["n"] += 1
     iid = str(_COUNTER["n"])
     _IMAGES[iid] = img
