@@ -228,13 +228,47 @@ def _split_test_patch(cut: Image.Image, tile: int, across: int,
     half = (across // 2) * pitch
     patch = Image.new("RGB", (W, H), board)
     for iy in range(rows):
-        xoff = pitch // 2 if iy % 2 else 0
-        x = xoff
+        # offset rows start one pitch left (cap clipped at the edge) so the left
+        # margin is full cap, not bare board — else it reads as a pale seam
+        x = (pitch // 2 - pitch) if iy % 2 else 0
         while x < half:  # overlap past the seam is painted over by the block
             patch.paste(cut, (x, iy * row_h), cut)
             x += pitch
     patch.paste(Image.new("RGB", (W - half, H), tuple(mosaic)), (half, 0))
     return patch
+
+
+# Detail that washes out at distance for the colour test. A patch of 3cm caps
+# stays fully resolved (you see individual caps) until absurd distances — what
+# actually merges at a few metres is each cap's INTERNAL logo/text, so the cap
+# reads as its flat average = the mosaic colour. So instead of shrinking the
+# whole patch into a dot (leaving nothing to judge), we keep it full-size on
+# screen and blur away sub-cap detail with distance: near = logos sharp, far =
+# each cap a flat mosaic-coloured disc that matches the solid block beside it.
+# `_MERGE_M` is the distance (m) at which sub-cap detail is fully gone.
+_MERGE_M = 12.0
+
+
+def _view_test(patch: Image.Image, across: int, distance_m: float,
+               display_w: int = 560) -> Image.Image:
+    """Keep the patch full-size; merge sub-cap detail as `distance_m` grows.
+
+    Elements resolved per cap fall from the crop's native detail (up close) to
+    1 (a single flat colour per cap = the mosaic colour) by `_MERGE_M`. The
+    merge is a linear-light area resample (physically-correct optical mixing),
+    then the result is scaled back up so the colour is always big enough to see.
+    """
+    from ..planner_designer import _resample_linear
+
+    native_per_cap = patch.width / max(1, across)
+    t = min(1.0, distance_m / _MERGE_M)          # 0 = in hand, 1 = fully merged
+    per_cap = native_per_cap * (1.0 - t) + 1.0 * t  # native detail -> 1 flat value
+    eff_w = max(across, int(round(across * per_cap)))
+    eff_h = max(1, int(round(eff_w * patch.height / patch.width)))
+    merged = _resample_linear(patch, eff_w, eff_h)
+    dh = max(1, int(round(display_w * patch.height / patch.width)))
+    # smooth magnify: the merged colour is what matters, not blocky pixels
+    return merged.resize((display_w, dh), Image.BILINEAR)
 
 
 @app.get("/inventory/test/{cap_id}")
@@ -244,14 +278,14 @@ def inventory_test(cap_id: int, distance_m: float = Query(2.0, ge=0.3, le=40.0),
     """The believe-your-eyes colour test for one scanned cap.
 
     Renders a physical patch — LEFT half: the cap's real photo tiled `across/2`
-    wide; RIGHT half: a solid block of its stored MOSAIC colour — then shows it
-    from `distance_m` with the same optics as the estimator (shrinks, stays
-    sharp, mixes in linear light). If the boundary between the halves vanishes
-    as you step back, the stored mosaic colour is what the eye really gets.
+    wide; RIGHT half: a solid block of its stored MOSAIC colour. The patch stays
+    full-size on screen; as `distance_m` grows, each cap's logo/text washes out
+    (linear-light merge) until the cap reads as its flat average. If the left
+    half melts into the solid block as you step back, the stored mosaic colour
+    is what the eye really gets from that cap in a wall.
 
-    ``bg`` sets BOTH the board behind the caps and the surrounding frame —
-    selectable because the surround shifts perceived colour (simultaneous
-    contrast); white by default, the hardest, most honest test.
+    ``bg`` sets the board behind the caps — selectable because the surround
+    shifts perceived colour (simultaneous contrast); white by default.
     """
     if not _DB.exists():
         raise HTTPException(404, "no cap database")
@@ -274,9 +308,7 @@ def inventory_test(cap_id: int, distance_m: float = Query(2.0, ge=0.3, le=40.0),
         raise HTTPException(500, "could not cut out the cap")
     board = _hex_rgb(bg, (255, 255, 255))
     patch = _split_test_patch(cut, tile, across, board, cap.mosaic_rgb or cap.rgb)
-    mm = canonical_diameter_mm(cap.size_class) or 32.1
-    out = view_at_distance(patch, across * mm, distance_m,
-                           frame_px=(900, 620), board=board)
+    out = _view_test(patch, across, distance_m)
     buf = io.BytesIO()
     out.save(buf, format="PNG")
     return Response(buf.getvalue(), media_type="image/png",

@@ -20,7 +20,11 @@ def inv_db(tmp_path, monkeypatch):
     crops = tmp_path / "crops"
     crops.mkdir()
     p = crops / "cap_0000_f0.png"
-    Image.fromarray(np.full((32, 32, 3), 90, np.uint8)).save(p)
+    # a cap face with internal detail (a bright logo) so the distance test has
+    # something to wash out: near = logo visible, far = flat average
+    face = np.full((48, 48, 3), 90, np.uint8)
+    face[18:30, 18:30] = 230  # logo patch
+    Image.fromarray(face).save(p)
     db = CapDataset(tmp_path / "caps.db")
     a = db.add_cap((10, 20, 30), frames=[FrameRecord(0, str(p), rgb=(10, 20, 30))],
                    captured_at="2026-07-04T00:00:00", source="test",
@@ -67,32 +71,33 @@ def test_inventory_delete_removes_row_and_files(inv_db):
     assert client.delete(f"/inventory/caps/{inv_db['a']}").status_code == 404
 
 
+def _left_half_std(png_bytes):
+    import io as _io
+
+    a = np.asarray(Image.open(_io.BytesIO(png_bytes)).convert("RGB")).astype(float)
+    left = a[:, : a.shape[1] // 2]  # the tiled-caps half
+    return float(left.reshape(-1, 3).std(axis=0).mean())
+
+
 def test_inventory_distance_test_renders(inv_db):
     import io as _io
 
-    r = client.get(f"/inventory/test/{inv_db['a']}?distance_m=1.0")
-    assert r.status_code == 200
-    img = Image.open(_io.BytesIO(r.content))
-    assert img.size == (900, 620)
-    # nearby the patch is big: frame carries both the tiled cap (gray 90-ish)
-    # and the solid mosaic half (50,60,70) as distinct colours
-    px = np.asarray(img.convert("RGB"))
-    assert (np.abs(px.astype(int) - [50, 60, 70]).sum(axis=2) < 12).any()
-    # far away it shrinks: much more (white, default) background than at 1m
-    far = client.get(f"/inventory/test/{inv_db['a']}?distance_m=10.0")
-    pf = np.asarray(Image.open(_io.BytesIO(far.content)).convert("RGB"))
-    bg = (px >= 250).all(axis=2).mean()
-    bgf = (pf >= 250).all(axis=2).mean()
-    assert bgf > bg
+    near = client.get(f"/inventory/test/{inv_db['a']}?distance_m=0.5")
+    assert near.status_code == 200
+    img = Image.open(_io.BytesIO(near.content))
+    assert img.width == 560 and img.height > 0  # full-size, not shrunk to a dot
+    # the patch stays full-size; the tiled half loses internal detail with
+    # distance (logo washes out -> flat average), so its variance drops
+    far = client.get(f"/inventory/test/{inv_db['a']}?distance_m=12.0")
+    assert _left_half_std(far.content) < _left_half_std(near.content) - 1.0
 
 
 def test_inventory_distance_test_selectable_background(inv_db):
-    import io as _io
-
-    r = client.get(f"/inventory/test/{inv_db['a']}?distance_m=6.0&bg=%23103050")
-    px = np.asarray(Image.open(_io.BytesIO(r.content)).convert("RGB"))
-    corner = px[:20, :20].reshape(-1, 3)
-    assert (np.abs(corner.astype(int) - [16, 48, 80]).sum(axis=1) < 12).all()
+    # the board colour shows through the gaps between caps, so two different
+    # boards must produce visibly different renders at a close distance
+    white = client.get(f"/inventory/test/{inv_db['a']}?distance_m=0.5&bg=%23ffffff")
+    dark = client.get(f"/inventory/test/{inv_db['a']}?distance_m=0.5&bg=%23103050")
+    assert white.content != dark.content
 
 
 def test_inventory_distance_test_404s(inv_db):

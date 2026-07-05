@@ -100,13 +100,14 @@ and delete a mis-scan with the mouse:
 ![the cap inventory browser: hundreds of scanned caps in a grid](docs/images/inventory-browser.png)
 
 Click any cap for the believe-your-eyes colour test: your cap's real photo
-tiled next to the solid *mosaic* colour the planner will use, both shrinking
-with a distance slider under physically-correct linear-light mixing. If the
-seam vanishes as you step back, the planner's colour is what your eye actually
-gets. Here a cap that looks deep **navy** in hand reads **grey-blue** at
-distance, because its white logo mixes in — exactly the field-vs-mosaic split:
+tiled next to the solid *mosaic* colour the planner will use. The patch stays
+full-size while a distance slider washes out each cap's logo (physically-correct
+linear-light mixing) — so you actually see the colour, instead of the piece
+shrinking to a dot. Up close you see the navy caps and their white logos; from
+across the room the logos merge and the caps read as one grey-blue that matches
+the planner's swatch — exactly the field-vs-mosaic split:
 
-![colour test: a navy cap tiled beside its grey-blue at-distance colour, blending as they shrink](docs/images/colour-test.png)
+![colour test: navy caps up close vs the same caps merged to grey-blue from a distance, matching the planner's swatch](docs/images/colour-test.png)
 
 ## 3. Build it
 

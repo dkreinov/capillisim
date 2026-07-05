@@ -103,13 +103,15 @@ the target and only reads once you stand far enough that caps blend.
   from the "My scanned caps" group: browse every scanned cap (photo,
   field|mosaic swatch bar, mm + S/L class, size filters) and delete a mis-scan
   with the mouse — click ×, then `delete?`; clicking anywhere else cancels.
-- `GET /inventory/test/{id}?distance_m=&across=` -> the believe-your-eyes
+- `GET /inventory/test/{id}?distance_m=&across=&bg=` -> the believe-your-eyes
   colour test (click any cap in the browser): LEFT half of a patch is the
   cap's real photo tiled, RIGHT half is the solid mosaic colour the planner
-  stores for it; the patch shrinks with the distance slider under the same
-  linear-light optics as the simulator. If the seam between the halves
-  disappears as you step back, the stored mosaic colour is exactly what the
-  eye gets from that cap in a wall. Cap tiles are cut GEOMETRY-DRIVEN
+  stores for it. The patch stays FULL-SIZE on screen; as `distance_m` grows,
+  each cap's logo/text washes out in linear light (a 3 cm cap stays resolved
+  as a disc until absurd distances — what actually merges at a few metres is
+  its internal detail), so the cap reads as its flat average. If the tiled
+  half melts into the solid block, the stored mosaic colour is what the eye
+  gets from that cap in a wall. Cap tiles are cut GEOMETRY-DRIVEN
   (`cap_crop.cap_circle` with the cap's known class size over the crop span):
   centre from the distance-transform peak or narrow-band Hough (white caps are
   invisible to thresholds), radius from the steepest radial-brightness step
