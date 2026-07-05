@@ -108,6 +108,25 @@ def test_real_caps_use_geometry_and_disk_cache(tmp_path):
     assert np.array_equal(np.asarray(caps2[0].image), a)
 
 
+def test_real_caps_pick_the_truest_frame_not_frame_zero(tmp_path):
+    import numpy as np
+    from cap_mosaic.data.store import CapDataset, FrameRecord
+
+    # frame 0 is a pale mis-capture; frame 1 matches the cap's true colour
+    pale = _cap_crop_file(str(tmp_path / "cap_0000_f0.png"), color=(150, 120, 110))
+    true = _cap_crop_file(str(tmp_path / "cap_0000_f1.png"), color=(200, 40, 40))
+    dbp = tmp_path / "caps.db"
+    with CapDataset(dbp) as db:
+        db.add_cap((200, 40, 40), captured_at="t",
+                   frames=[FrameRecord(frame_index=0, path=pale, rgb=(150, 120, 110)),
+                           FrameRecord(frame_index=1, path=true, rgb=(200, 40, 40))],
+                   diameter_mm=30.0, crop_span_mm=56.25)
+    caps = cap_render._real_caps(str(dbp), 64, dbp.stat().st_mtime)
+    a = np.asarray(caps[0].image)
+    r, g, b, _ = a[32, 32]
+    assert r > 170 and g < 90     # the crisp red frame won, not the pale one
+
+
 def test_close_up_has_cap_texture_that_distance_blurs_away():
     plan = _plan()
     colors = list({tuple(c.rgb) for c in plan.cells if not c.is_hole})

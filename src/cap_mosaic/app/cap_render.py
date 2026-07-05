@@ -38,15 +38,30 @@ def _load_circular(path: str, size: int,
 _LEGACY_SPAN_MM = 37.8  # crop window width implied for rows without crop_span_mm
 
 
-def _cutout_cached(cutout_dir: Path, cap_id: int, path: str, size: int,
-                   radius_frac: float | None) -> Image.Image | None:
+def _best_frame(c) -> object:
+    """The frame whose colour is truest to the cap's canonical (median) colour.
+
+    Frame 0 is just 'first in the burst' — it can be a pale mis-capture (hand
+    still in frame, glare, haze) while later frames are crisp. The cap's stored
+    colour is the median across frames, so the closest frame is the honest face.
+    """
+    scored = [f for f in c.frames if f.rgb is not None]
+    if not scored:
+        return c.frames[0]
+    ref = rgb_to_lab(tuple(c.rgb))
+    return min(scored, key=lambda f: ciede2000(ref, rgb_to_lab(tuple(f.rgb))))
+
+
+def _cutout_cached(cutout_dir: Path, cap_id: int, frame_index: int, path: str,
+                   size: int, radius_frac: float | None) -> Image.Image | None:
     """The cap's normalized cutout, served from ``dataset/cutouts/`` when fresh.
 
     Cropping 400+ caps live (imread + circle refinement each) is the slow part;
     the cutout is deterministic per (crop file, size), so it is computed once and
-    persisted next to the db. Stale (source newer) or missing -> recomputed.
+    persisted next to the db. Stale (source newer) or missing -> recomputed. The
+    frame index is part of the name so a changed frame CHOICE busts the cache.
     """
-    out = cutout_dir / f"cap{cap_id:04d}_{size}.png"
+    out = cutout_dir / f"cap{cap_id:04d}_f{frame_index}_{size}.png"
     src = Path(path)
     if out.exists() and src.exists() and out.stat().st_mtime >= src.stat().st_mtime:
         try:
@@ -74,7 +89,8 @@ def _real_caps(db_path: str, size: int, mtime: float) -> tuple[CapImage, ...]:
             # the card geometry gives the cap's exact radius inside the crop
             span = c.crop_span_mm or _LEGACY_SPAN_MM
             rf = (c.diameter_mm / span) / 2.0 if c.diameter_mm else None
-            im = _cutout_cached(cutout_dir, c.id, c.frames[0].path, size, rf)
+            fr = _best_frame(c)
+            im = _cutout_cached(cutout_dir, c.id, fr.frame_index, fr.path, size, rf)
             if im is not None:
                 # match by the at-distance (mosaic) colour so a busy cap lands
                 # where its MIX belongs, not where its field colour belongs
