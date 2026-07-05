@@ -148,7 +148,10 @@ In the estimator's **My scanned caps (N)** group:
   the result is honest about it: scan more caps or pick a bolder subject.
 - **Patterns from my caps** (▤ Gradient / 🌀 Spiral / ☀ Sunburst): lay out the
   inventory ITSELF: every owned cap exactly once, zero colour error, always
-  buildable. The result lands in the version strip like any image.
+  buildable. The result lands in the version strip like any image. A real
+  416-cap inventory rendered as all three:
+
+  ![the same 416 owned caps as gradient, spiral and sunburst](images/patterns-inventory.jpg)
 - **📋 AI prompt for my palette**: copies a generation prompt constrained to
   your dominant cap colours and total count; paste it into any image
   generator, then paste the result back into the app.
