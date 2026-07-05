@@ -72,6 +72,21 @@ crowns vs 38 mm large caps), so the inventory knows which caps fit which artwork
 
 ![automatic size measurement of a large cap](docs/images/cap-size-measure.png)
 
+Every scanned cap lands in a browsable inventory (http://127.0.0.1:8000/inventory)
+— photo, field|mosaic swatch bar, measured size — where you can filter by size
+and delete a mis-scan with the mouse:
+
+![the cap inventory browser: hundreds of scanned caps in a grid](docs/images/inventory-browser.png)
+
+Click any cap for the believe-your-eyes colour test: your cap's real photo
+tiled next to the solid *mosaic* colour the planner will use, both shrinking
+with a distance slider under physically-correct linear-light mixing. If the
+seam vanishes as you step back, the planner's colour is what your eye actually
+gets. Here a cap that looks deep **navy** in hand reads **grey-blue** at
+distance, because its white logo mixes in — exactly the field-vs-mosaic split:
+
+![colour test: a navy cap tiled beside its grey-blue at-distance colour, blending as they shrink](docs/images/colour-test.png)
+
 ## 3. Build it
 
 Two projector modes place the caps on the board at true 1:1 scale

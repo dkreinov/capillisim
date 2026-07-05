@@ -115,6 +115,12 @@ the target and only reads once you stand far enough that caps blend.
   invisible to thresholds), radius from the steepest radial-brightness step
   under a size prior — so tiles meet at the metal edge like really glued caps.
 
+The inventory browser and the colour test:
+
+![the cap inventory browser: hundreds of scanned caps in a grid](images/inventory-browser.png)
+
+![colour test: a navy cap tiled beside its grey-blue at-distance colour, blending as they shrink](images/colour-test.png)
+
 ## Building from caps (projector)
 
 Once you have a `.capproj.json` plan, `app/project_plan.py` projects it onto the
