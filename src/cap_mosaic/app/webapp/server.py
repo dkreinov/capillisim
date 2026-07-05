@@ -244,25 +244,63 @@ def _label_font(size: int):
     return ImageFont.load_default()
 
 
+_SS_W = 1920  # supersample width so caps always tile with correct ~9% grout
+
+
 def _render_wall(cut: Image.Image, caps_left: int, frame: tuple[int, int],
                  board: tuple[int, int, int], mosaic: tuple[int, int, int]) -> Image.Image:
     """Constant-size frame: LEFT half hex-packed caps sized to fit `caps_left`
-    across, RIGHT half the solid mosaic colour. More caps => smaller caps."""
+    across, RIGHT half the solid mosaic colour. More caps => smaller caps.
+
+    Painted and blended entirely in LINEAR light: shrinking/blending caps in
+    sRGB darkens a navy+white cap to the wrong colour (its sRGB mean is far from
+    its linear mean, which is the stored mosaic value). And the caps are drawn
+    at a SUPERSAMPLED width (so they always tile with the real ~9% grout, never
+    leaking extra board as they shrink) then area-downsampled to the frame — so
+    far away the tiled half converges to the mosaic colour plus a *constant*
+    grout dilution, exactly as a real wall reads.
+    """
+    import cv2
+
+    from ..planner_designer import _linear_to_srgb, _srgb_to_linear
+
     fw, fh = frame
-    half = fw // 2
-    tile = max(2, int(round(half / caps_left)))
-    small = cut.resize((tile, tile), Image.LANCZOS)
-    img = Image.new("RGB", (fw, fh), tuple(board))
+    ss_w = _SS_W
+    ss_h = int(round(fh * ss_w / fw))
+    half = ss_w // 2
+    tile = max(6, int(round(half / caps_left)))  # >=6px: clean circle + true grout
+
+    ca = np.asarray(cut.convert("RGBA")).astype(np.float32) / 255.0
+    rgb_lin = _srgb_to_linear(ca[..., :3]).astype(np.float32)
+    alpha = ca[..., 3:4]
+    prem = cv2.resize(rgb_lin * alpha, (tile, tile), interpolation=cv2.INTER_AREA)
+    a_small = cv2.resize(alpha, (tile, tile), interpolation=cv2.INTER_AREA)[..., None]
+
+    buf = np.empty((ss_h, ss_w, 3), np.float32)
+    buf[:] = _srgb_to_linear(np.asarray(board, np.float32) / 255.0)
+
+    def blit(x: int, y: int) -> None:
+        x0, y0 = max(0, x), max(0, y)
+        x1, y1 = min(ss_w, x + tile), min(ss_h, y + tile)
+        if x1 <= x0 or y1 <= y0:
+            return
+        p = prem[y0 - y:y1 - y, x0 - x:x1 - x]
+        a = a_small[y0 - y:y1 - y, x0 - x:x1 - x]
+        buf[y0:y1, x0:x1] = p + (1.0 - a) * buf[y0:y1, x0:x1]  # premultiplied over
+
     pitch = max(1, int(round(tile * _PACK)))
     row_h = max(1, int(round(pitch * 0.8660254)))
-    for iy in range(-1, fh // row_h + 2):
+    for iy in range(-1, ss_h // row_h + 2):
         # offset rows bleed one pitch left so the margin is full cap, not board
         x = (pitch // 2 - pitch) if iy % 2 else 0
         while x < half:
-            img.paste(small, (x, iy * row_h), small)
+            blit(x, iy * row_h)
             x += pitch
-    img.paste(Image.new("RGB", (fw - half, fh), tuple(mosaic)), (half, 0))
-    return img
+    buf[:, half:] = _srgb_to_linear(np.asarray(mosaic, np.float32) / 255.0)
+
+    small = cv2.resize(buf, (fw, fh), interpolation=cv2.INTER_AREA)  # linear-light merge
+    out = np.clip(_linear_to_srgb(small) * 255.0 + 0.5, 0, 255).astype(np.uint8)
+    return Image.fromarray(out, "RGB")
 
 
 def _view_test(cut: Image.Image, mosaic: tuple[int, int, int],

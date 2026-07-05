@@ -85,6 +85,34 @@ def test_inventory_distance_test_constant_frame(inv_db):
     assert near.content != far.content
 
 
+def test_far_view_converges_to_mosaic_colour_in_linear_light():
+    # the fix: blending must be in LINEAR light. A navy+white cap's sRGB-space
+    # mean is far from its linear mean (the stored mosaic value); if the wall
+    # blended in sRGB the far view would be the wrong colour. On a board set to
+    # the cap's own colour (grout invisible), the far tiled half must match the
+    # mosaic colour it was built from.
+    from cap_mosaic.app.webapp.server import _render_wall, _MAX_CAPS
+
+    tile = 32
+    cap = Image.new("RGBA", (tile, tile), (0, 0, 0, 0))
+    from PIL import ImageDraw
+
+    dr = ImageDraw.Draw(cap)
+    dr.ellipse([0, 0, tile - 1, tile - 1], fill=(10, 20, 90, 255))   # navy field
+    dr.ellipse([9, 9, 22, 22], fill=(240, 240, 240, 255))            # white logo
+    # the cap's own linear-light mean = the "mosaic" colour it should read as
+    a = np.asarray(cap).astype(np.float32) / 255.0
+    inside = a[..., 3] > 0.5
+    lin = ((a[inside, :3]) ** 2.4).mean(0)  # rough sRGB->linear->mean
+    mosaic = tuple(int(round((v ** (1 / 2.4)) * 255)) for v in lin)
+
+    far = np.asarray(_render_wall(cap, _MAX_CAPS, (640, 420), mosaic, mosaic))
+    left = far[:, :320].reshape(-1, 3).mean(0)
+    # board == mosaic, so grout is invisible; far tiled half ~= mosaic colour.
+    # (A buggy sRGB blend would land ~40 levels darker.)
+    assert np.abs(left - np.array(mosaic)).max() < 14, (left, mosaic)
+
+
 def test_caps_get_smaller_and_more_with_distance():
     # stepping back fits more caps into the same window (caps_across ∝ distance)
     from cap_mosaic.app.webapp.server import _caps_across_for, _BASE_CAPS, _MAX_CAPS
