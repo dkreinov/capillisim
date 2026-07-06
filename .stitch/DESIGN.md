@@ -74,3 +74,27 @@ system-ui) and the simulation canvas staged as the hero.
   the one dramatic shadow; every other card stays flat and clean.
 - **Motion:** one staggered load-in (columns fade+rise 300ms, 60ms apart);
   existing hover/press polish retained; transform/opacity only.
+
+## Scores (Qwen UI judge, same rubric throughout)
+
+| State | Score |
+|---|---|
+| Baseline (pre design-system) | 78 |
+| Pass 1: full token system, type identity, hero stage, accent discipline | 78 |
+| Pass 2: styled slider tracks/thumbs; responsive check passes at 740px | 78 |
+
+**Loop verdict:** plateau — the stop rule fired. The judge's discrimination is
+band-coarse for this genre (three visibly different UIs scored identically, and
+some round-3 issues were hallucinated, e.g. a "#FF4757 accent" that never
+existed). Use the judge for *finding concrete issues* (its issue lists were
+consistently useful) rather than for measuring deltas; human eyes confirm the
+pass-1 result is a clear visual upgrade.
+
+## Final tokens
+
+The `:root` block in `static/style.css` is the source of truth: surfaces
+(--surface-0/1/2), borders (--border-1/2), accents (--acc gold action/selection,
+--ai indigo, --link blue), rhythm (--s1..--s6 = 4/8/12/16/24/32), radii
+(--r-ctl 8 / --r-card 12 / --r-hero 16), fonts (Space Grotesk display, IBM Plex
+Sans body, IBM Plex Mono numerals). New CSS must pick from these; adding a raw
+hex is a design-system regression.
