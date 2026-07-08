@@ -37,6 +37,7 @@ _DB = Path("dataset/caps.db")
 _MAX_CAPS_ACROSS = 140  # render resolution ceiling; bigger size -> more detail
 _SIM_WIDTH_PX = 1200  # target simulation width; tile px adapts to keep it bounded
 _FRAME_PX = (900, 650)  # fixed field-of-view frame the mosaic shrinks inside
+_STAGE_BG = (20, 24, 38)  # dark-space wall behind the framed piece (= CSS --surface-1)
 _INV_TOL = 12.0  # CIEDE2000 within which an owned cap counts toward a BOM colour
 
 
@@ -636,7 +637,8 @@ def simulate(
     if distance_m is not None:
         # Shrink the sharp mosaic into a fixed FOV frame; caps merge via the
         # linear-light resample rather than a growing blur.
-        mosaic = view_at_distance(mosaic, res["width_mm"], distance_m, _FRAME_PX)
+        mosaic = view_at_distance(mosaic, res["width_mm"], distance_m, _FRAME_PX,
+                                  board=_STAGE_BG)
     buf = io.BytesIO()
     mosaic.save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png")
@@ -752,7 +754,7 @@ def target(
     img = _get(image_id).convert("RGB")
     res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
     if distance_m is not None:
-        out = view_at_distance(img, res["width_mm"], distance_m, _FRAME_PX)
+        out = view_at_distance(img, res["width_mm"], distance_m, _FRAME_PX, board=_STAGE_BG)
     else:  # no distance -> match the sharp mosaic's canvas size
         capped = max(1, min(res["caps_across"], _MAX_CAPS_ACROSS))
         px_per_cap = max(6, min(22, _SIM_WIDTH_PX // capped))
