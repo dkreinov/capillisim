@@ -25,13 +25,14 @@ function fromMyCaps() {
   return document.querySelector('input[name=planFrom]:checked').value === "mine";
 }
 function colorsN() { return Math.max(4, Math.min(24, Number($("colorsN").value) || 12)); }
+function ownThreshold() { return Math.max(2, Math.min(30, Number($("ownThr").value) || 12)); }
 function extraParams() {
   const p = { bg_color: bgColor(), dither: dither(), colors: colorsN() };
   if (preset()) p.preset = preset();
   if (thicken()) p.thicken = true;
   if (realOnly()) p.real_only = true;
   if (useInv()) p.inventory = true;
-  if (fromMyCaps()) p.from_my_caps = true;
+  if (fromMyCaps()) { p.from_my_caps = true; p.own_threshold = ownThreshold(); }
   return p;
 }
 
@@ -255,6 +256,7 @@ $("realOnly").addEventListener("change", refresh);
 $("dither").addEventListener("change", refresh);
 $("useInv").addEventListener("change", refresh);
 $("colorsN").addEventListener("change", refresh);
+$("ownThr").addEventListener("input", () => { $("ownThrVal").textContent = ownThreshold(); debounced(); });
 
 // caps-I-own mode implies photo rendering (the plan IS your caps); the preview
 // checkbox locks on there and restores the user's choice back in ideal mode
@@ -262,6 +264,7 @@ let realOnlyBeforeLock = null;
 function syncCapsMode() {
   const mine = fromMyCaps();
   const ro = $("realOnly");
+  $("ownThrRow").hidden = !mine;   // threshold slider only applies in caps-I-own mode
   if (mine) {
     if (realOnlyBeforeLock === null) realOnlyBeforeLock = ro.checked;
     ro.checked = true; ro.disabled = true;
@@ -423,8 +426,16 @@ async function refresh() {
   const inv = b.inventory || null;
   const it = $("invtotals");
   const lines = [];
-  if (b.stock_used)
-    lines.push(`designed from your caps: placing ${b.stock_used.used} of the ${b.stock_used.owned} you own`);
+  if (b.stock_used) {
+    const s = b.stock_used;
+    lines.push(`designed from your caps: placing ${s.used} of the ${s.owned} you own`);
+    // caps-I-own group readout: how many caps qualify + how many colours result,
+    // both of which move as the match-tolerance slider changes
+    $("usableNote").textContent =
+      `using ${s.used} of ${s.owned} caps · ${b.colors_used} colour${b.colors_used === 1 ? "" : "s"}`;
+  } else {
+    $("usableNote").textContent = "";
+  }
   if (b.inventory_totals) {
     const t = b.inventory_totals;
     lines.push(`you own ${t.owned} caps — ${t.have} of ${t.need} needed (${(100 * t.have / Math.max(1, t.need)).toFixed(1)}%)`);
