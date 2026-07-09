@@ -97,9 +97,7 @@ h1 span { color:var(--mut); font:400 13px/1 var(--font-body); }
   height:100vh; overflow:hidden;
   display:grid;
   grid-template-columns:320px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);
-  /* bottom rail is capped (minmax 0..38vh): a huge BOM scrolls inside it instead
-     of growing tall and starving the hero/sim above it. */
-  grid-template-rows:auto minmax(0,1fr) minmax(0,38vh);
+  grid-template-rows:auto minmax(0,1fr) auto;
   grid-template-areas:
     "brand    img   size  caps"
     "palette  hero  hero  hero"
@@ -258,9 +256,16 @@ input[type=checkbox], input[type=radio] { accent-color:var(--acc); width:15px; h
   border-radius:var(--r-card); padding:var(--s3) var(--s4); font-size:14px; box-shadow:0 6px 24px #000a; }
 
 .critique { background:var(--surface-1); border:1px solid var(--border-1);
-  border-radius:var(--r-card); padding:var(--s2) var(--s4); }
-.critique .chead { display:flex; align-items:center; gap:var(--s3); }
+  border-radius:var(--r-card); padding:var(--s2) var(--s4); flex:0 0 auto; }
+/* collapsible: the summary (score + verdict + AI buttons) is always visible; the
+   tips/LLM body folds away so the mosaic below stays the star. */
+.critique > summary { display:flex; align-items:center; gap:var(--s3); cursor:pointer;
+  list-style:none; }
+.critique > summary::-webkit-details-marker { display:none; }
 .critique .chead > div { margin-right:auto; }
+.foldchev { color:var(--mut); font-size:12px; transition:transform .15s; flex:0 0 auto; }
+.critique[open] .foldchev, .bom[open] .foldchev { transform:rotate(180deg); }
+.cbody { padding-top:var(--s2); }
 .cscore { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px;
   border-radius:50%; font:600 16px/1 var(--font-mono); color:#0d0f14; background:#8a94a6; flex:0 0 auto; }
 .cscore.great { background:#4ad07a; } .cscore.good { background:#a7d84a; }
@@ -314,14 +319,22 @@ input[type=checkbox], input[type=radio] { accent-color:var(--acc); width:15px; h
 
 .bom { flex:1; min-width:0; background:var(--surface-1); border:1px solid var(--border-1);
   border-radius:var(--r-card); padding:var(--s3) var(--s4); display:flex; flex-direction:column; min-height:0; }
-.bom h3 { margin:0 0 var(--s2); font:700 12px/1.4 var(--font-display); letter-spacing:.6px;
+/* collapsible + fixed height: the colour list scrolls inside; collapsing it hands
+   the whole rail back to the mosaic. */
+.bom > summary { display:flex; align-items:center; gap:var(--s2); cursor:pointer;
+  list-style:none; margin-bottom:var(--s2); }
+.bom > summary::-webkit-details-marker { display:none; }
+.bom h3 { margin:0; font:700 12px/1.4 var(--font-display); letter-spacing:.6px;
   text-transform:uppercase; color:var(--mut); display:flex; align-items:center; gap:var(--s2); }
-.bom h3 .capmaplink { margin-left:auto; }
+.bom summary .capmaplink { margin-left:auto; }
+.bomcount { font-family:var(--font-mono); color:var(--ink); background:var(--surface-2);
+  border:1px solid var(--border-1); border-radius:999px; padding:1px 8px; font-size:11px;
+  text-transform:none; letter-spacing:0; }
 /* colours laid out horizontally as compact chips, wrapping across the rail */
-/* fill the remaining rail height and SCROLL when there are many colours, so the
-   chips keep their size and the list never pushes into the layout above. */
+/* fixed max height: many colours SCROLL inside this box; the chips keep their
+   size and the list never grows tall enough to shrink the mosaic above it. */
 .bom ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--s1) var(--s2);
-  flex:1 1 0; min-height:0; overflow-y:auto; align-content:flex-start; }
+  max-height:26vh; overflow-y:auto; align-content:flex-start; }
 .bom li { display:flex; align-items:center; gap:6px;
   font-variant-numeric:tabular-nums; font-family:var(--font-mono); font-size:12px; }
 .bom .sw { width:16px; height:16px; border-radius:4px; border:1px solid #0006; flex:0 0 auto; }

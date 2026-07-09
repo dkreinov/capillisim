@@ -152,6 +152,7 @@ let lastAIActions = [];
 // the AI-verdict box: text + the apply button that appears when the judge
 // recommended concrete settings
 function showAI(text, actions) {
+  $("critique").open = true;   // the verdict lives in the collapsible body — reveal it
   $("cllm").hidden = false;
   $("cllmText").textContent = text;
   lastAIActions = actions || [];
@@ -257,6 +258,11 @@ $("dither").addEventListener("change", refresh);
 $("useInv").addEventListener("change", refresh);
 $("colorsN").addEventListener("change", refresh);
 $("ownThr").addEventListener("input", () => { $("ownThrVal").textContent = ownThreshold(); debounced(); });
+// buttons/links that live inside a collapsible <summary> must not toggle it
+["askLLM", "aiSimplify", "capmap"].forEach((id) => {
+  const el = $(id);
+  if (el) el.addEventListener("click", (e) => e.stopPropagation());
+});
 
 // caps-I-own mode implies photo rendering (the plan IS your caps); the preview
 // checkbox locks on there and restores the user's choice back in ideal mode
@@ -445,6 +451,7 @@ async function refresh() {
 
   // BOM — click a colour to isolate where those caps go (others ghosted)
   const ul = $("bom"); ul.innerHTML = "";
+  $("bomcount").textContent = `${b.colors_used} colour${b.colors_used === 1 ? "" : "s"}`;
   if (highlight && !(highlight in b.bom)) highlight = null;  // colour no longer present
   for (const [hex, n] of Object.entries(b.bom)) {
     const li = document.createElement("li");

@@ -140,8 +140,8 @@
       <div id="warning" class="warning" hidden></div>
       <div id="notice" class="notice" hidden></div>
 
-      <div id="critique" class="critique" hidden>
-        <div class="chead">
+      <details id="critique" class="critique" hidden>
+        <summary class="chead">
           <span id="cscore" class="cscore">–</span>
           <div>
             <b id="cverdict">Cap-art check</b>
@@ -149,13 +149,16 @@
           </div>
           <button id="askLLM" class="btn-ai" data-tip="Ask the AI (Qwen vision) to judge this image: score, what works, what to fix. If it recommends settings, an apply button appears with its verdict.">🧠 AI judge</button>
           <button id="aiSimplify" class="btn-ai" data-tip="The AI redraws the image itself into cap-friendly art: flat colours, thick outlines, clean background — keeping the original colours. Lands as a new version in the strip; the original stays.">🎨 AI simplify</button>
+          <span class="foldchev" aria-hidden="true">▾</span>
+        </summary>
+        <div class="cbody">
+          <ul id="ctips" class="ctips"></ul>
+          <div id="cllm" class="cllm" hidden>
+            <div id="cllmText"></div>
+            <button id="applyAI" class="btn-gold" hidden data-tip="Apply the settings the AI judge just recommended (colours, thicken, dither, size, palette). Keeps a 'before' snapshot next to the new simulation so you can compare.">🪄 Apply the AI's settings</button>
+          </div>
         </div>
-        <ul id="ctips" class="ctips"></ul>
-        <div id="cllm" class="cllm" hidden>
-          <div id="cllmText"></div>
-          <button id="applyAI" class="btn-gold" hidden data-tip="Apply the settings the AI judge just recommended (colours, thicken, dither, size, palette). Keeps a 'before' snapshot next to the new simulation so you can compare.">🪄 Apply the AI's settings</button>
-        </div>
-      </div>
+      </details>
 
       <div class="simwrap">
         <img id="sim" alt="mosaic simulation" />
@@ -179,14 +182,17 @@
         <div><span>colours (used / seen)</span><b id="colours">–</b></div>
       </div>
 
-      <div class="bom" id="bomwrap" hidden>
-        <h3>Caps needed by colour
-          <small style="font-weight:400;opacity:.7">— click a colour to isolate it</small>
+      <details class="bom" id="bomwrap" hidden open>
+        <summary>
+          <h3>Caps needed by colour <span id="bomcount" class="bomcount"></span>
+            <small style="font-weight:400;opacity:.7">— click a colour to isolate it</small>
+          </h3>
           <a id="capmap" class="capmaplink tip-left" target="_blank" rel="noopener" data-tip="Download a printable paint-by-numbers sheet: a letter per colour on every cell, row/column rulers, and a legend with counts.">⬇ Cap map (PDF)</a>
-        </h3>
+          <span class="foldchev" aria-hidden="true">▾</span>
+        </summary>
         <div id="invtotals" class="invtotals" hidden></div>
         <ul id="bom"></ul>
-      </div>
+      </details>
     </div>
   </div>
 
