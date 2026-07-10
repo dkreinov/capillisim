@@ -124,8 +124,21 @@ the target and only reads once you stand far enough that caps blend.
   so each owned cap fills a cell instead of drowning in holes (see below).
   /estimate adds `stock_used {used, owned, usable}` and reports the fitted piece's
   `caps_across` / `width_mm`.
-- `GET /pattern?kind=gradient|spiral|sunburst` -> the whole inventory laid out
-  as a pattern (every cap exactly once), stored as a new image id
+- `GET /pattern?kind=&width_mm=&height_mm=&unlimited=&shape=&poly=` -> the
+  inventory laid out as a pattern, stored as a new image id. Nine kinds
+  (`GET /pattern_kinds` serves the registry + blurbs). No dims = every cap
+  exactly once on a near-square grid; with dims the pattern fills that frame
+  and the response's `cells`/`missing` are the buildability numbers (surplus
+  stock is evenly subsampled, endpoints kept; a shortfall leaves holes);
+  `unlimited=true` repeats the distinct owned colours in equal shares
+  (reference palette when there is no DB — otherwise no-DB is 404); shape/poly
+  clip it like any mosaic
+- `GET /pattern_thumb?kind=` -> a small procedural preview for the gallery
+  strip (cached against the DB's mtime)
+- `GET /ai_pattern?width_mm=&height_mm=` -> Qwen text-to-image generates an
+  abstract pattern constrained to the owned palette (prompt shared with
+  /palette_prompt), stored as a new image id; 404 without an inventory, 502
+  with the underlying error (e.g. missing QWEEN_KEY)
 - `GET /palette_prompt` -> a paste-anywhere AI prompt constrained to the owned
   palette + cap count
 - `GET /inventory` -> the cap-inventory browser page; `GET /inventory/caps`
