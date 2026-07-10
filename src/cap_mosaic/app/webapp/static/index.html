@@ -90,10 +90,11 @@
               <label class="chk" data-tip="Cosmetic only: draws the simulation tiles with photos of YOUR scanned caps instead of generated look-alikes. Changes nothing about the plan or the counts."><input type="checkbox" id="realOnly" /> Show photos of my caps in the preview <span id="realOnlyNote" class="mutnote" hidden>(always on in caps-I-own mode)</span></label>
               <label class="chk" data-tip="Adds have / short columns to the caps-by-colour list below: how many of each colour you already own vs still need."><input type="checkbox" id="useInv" /> Shopping list (have / short per colour)</label>
             </div>
-            <div class="palette" style="margin-top:8px">
-              <button id="patGradient" data-tip="Lay out every cap you own as a light-to-dark gradient. Every cap used exactly once, zero colour error — always buildable.">▤ Gradient</button>
-              <button id="patSpiral" data-tip="Every cap you own, sorted by hue and swept around concentric rings — a colour-wheel spiral of your inventory.">🌀 Spiral</button>
-              <button id="patSunburst" data-tip="Every cap you own in concentric rings, bright core fading to a dark rim.">☀ Sunburst</button>
+            <div class="patterns" style="margin-top:8px">
+              <div class="gheadrow">Patterns from my caps
+                <label class="chk" data-tip="Repeat your distinct colours freely instead of using each physical cap once — the rectangle never turns red, and the pattern shows what a topped-up stock could build."><input type="checkbox" id="patUnlimited" /> unlimited stock</label>
+              </div>
+              <div id="patGallery" class="patgallery" data-tip="Lay your inventory out as a pattern instead of an image. Every owned cap used exactly once (zero colour error) unless 'unlimited stock' is on. In Pattern mode, drag the rectangle on the stage to size it."></div>
               <button id="copyPrompt" data-tip="Copy an AI-image prompt constrained to your caps' colours and count — paste it into any image generator, then drop the result back here.">📋 AI prompt for my palette</button>
             </div>
             <small class="ghint">Scanned caps feed everything here: the shopping list, the photo preview, stock-limited plans and the patterns.</small>

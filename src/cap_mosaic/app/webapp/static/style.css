@@ -369,6 +369,22 @@ input[type=checkbox], input[type=radio] { accent-color:var(--acc); width:15px; h
   cursor:pointer; visibility:hidden; }
 .bom .bomrow:hover .knock { visibility:visible; }
 .bom .knock:hover { border-color:#d05a5a; color:#e08484; }
+/* pattern gallery + sizing rectangle */
+.patterns .gheadrow { display:flex; align-items:center; gap:var(--s2); font-size:13px; }
+.patgallery { display:flex; flex-wrap:wrap; gap:var(--s1); margin:var(--s2) 0; }
+.pat { display:flex; flex-direction:column; align-items:center; gap:2px; padding:4px;
+  background:var(--surface-2); border:1px solid var(--border-1); border-radius:8px;
+  cursor:pointer; font-size:11px; color:var(--mut); }
+.pat:hover { border-color:var(--acc); color:var(--ink); }
+.pat img { width:56px; height:56px; border-radius:6px; display:block; }
+.pat:disabled { opacity:.5; }
+.patrect { fill:rgba(240,200,80,.06); stroke:var(--acc); stroke-width:2;
+  cursor:move; }
+.patrect.short { stroke:#e05252; fill:rgba(224,82,82,.07); }
+.pathandle { fill:var(--acc); stroke:#1c2230; cursor:nwse-resize; }
+.pathandle.short { fill:#e05252; }
+.patlabel { fill:#e8d9a8; font:600 13px var(--font-mono); }
+.patlabel.short { fill:#f09090; }
 /* shape picker + freeform outline drawing */
 .shaperow { display:flex; align-items:center; gap:var(--s2); font-size:13px; }
 .shaperow select { flex:0 0 auto; }

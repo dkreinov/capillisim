@@ -161,6 +161,7 @@ async function upload(file) {
   dz.querySelector("p").innerHTML = `loaded ${b.width}×${b.height} <small>· drop / paste another to replace</small>`;
   dz.classList.add("slim");
   versions = [];  // a fresh upload starts a fresh version history
+  activePattern = null;
   addVersion(b, "Original");
   $("imagepanel").hidden = false;
   $("origwrap").hidden = false;
@@ -355,24 +356,176 @@ function syncCapsMode() {
 document.querySelectorAll('input[name=planFrom]').forEach((r) =>
   r.addEventListener("change", () => { syncCapsMode(); refresh(); }));
 
-// patterns from the owned inventory: land as new versions in the strip
-for (const [btn, kind] of [["patGradient", "gradient"], ["patSpiral", "spiral"], ["patSunburst", "sunburst"]]) {
-  $(btn).addEventListener("click", async () => {
-    const b0 = $(btn); b0.disabled = true;
-    try {
-      const r = await fetch("/pattern?" + new URLSearchParams({ kind }));
-      if (!r.ok) { toast(r.status === 404 ? "Scan some caps first — the inventory is empty." : "Pattern failed"); return; }
-      const b = await r.json();
-      if (!versions.length) {  // patterns can be the very first "image"
-        $("imagepanel").hidden = false; $("origwrap").hidden = false; $("croptools").hidden = false;
-        $("versionswrap").hidden = false; $("controls").hidden = false;
-        $("stats").hidden = false; $("bomwrap").hidden = false;
-      }
-      addVersion(b, `Pattern ${kind}`);
-      toast(`Pattern laid out from ${b.caps} of your caps`);
-    } finally { b0.disabled = false; }
-  });
+// --- patterns from the owned inventory: a gallery driven by the server's
+//     registry; each pattern lands as a version, and regenerating (new kind,
+//     new rectangle size) REPLACES the active pattern version in the strip ---
+let activePattern = null;   // {kind} while a pattern version is active
+function patUnlimited() { return $("patUnlimited").checked; }
+
+async function generatePattern(kind) {
+  const q = new URLSearchParams({ kind, width_mm: Math.round(patRect.w),
+                                  height_mm: Math.round(patRect.h) });
+  if (patUnlimited()) q.set("unlimited", true);
+  if (shape() === "poly" && polyFrac) {
+    q.set("poly", polyFrac.map((p) => `${p.x.toFixed(4)},${p.y.toFixed(4)}`).join(";"));
+  } else if (shape() !== "rect") {
+    q.set("shape", shape());
+  }
+  const r = await fetch("/pattern?" + q.toString());
+  if (!r.ok) {
+    toast(r.status === 404
+      ? "Scan some caps first — or tick 'unlimited stock' to preview with a reference palette."
+      : "Pattern failed");
+    return;
+  }
+  const b = await r.json();
+  if (!versions.length) {  // patterns can be the very first "image"
+    $("imagepanel").hidden = false; $("origwrap").hidden = false; $("croptools").hidden = false;
+    $("versionswrap").hidden = false; $("controls").hidden = false;
+    $("stats").hidden = false; $("bomwrap").hidden = false;
+  }
+  const prev = activePattern &&
+    versions.find((v) => v.label.startsWith("Pattern") && v.id === imageId);
+  if (prev) {           // regenerate in place: no version-strip spam
+    prev.id = b.id; prev.aspect = b.aspect; prev.label = `Pattern ${kind}`;
+    activePattern = { kind };
+    renderVersions();
+    activateVersion(b.id);
+  } else {
+    addVersion(b, `Pattern ${kind}`);
+    activePattern = { kind };
+  }
+  toast(b.missing > 0
+    ? `Pattern needs ${b.cells.toLocaleString()} caps — you're ${b.missing.toLocaleString()} short (bare cells shown).`
+    : `Pattern laid out from ${b.caps.toLocaleString()} caps.`);
+  drawPatRect();
 }
+
+(async function loadPatternGallery() {
+  try {
+    const b = await (await fetch("/pattern_kinds")).json();
+    const box = $("patGallery");
+    for (const kind of b.kinds) {
+      const tile = document.createElement("button");
+      tile.className = "pat";
+      tile.dataset.tip = (b.blurbs && b.blurbs[kind]) || kind;
+      tile.innerHTML =
+        `<img src="/pattern_thumb?kind=${kind}" alt="${kind}" loading="lazy" /><span>${kind}</span>`;
+      tile.addEventListener("click", async () => {
+        tile.disabled = true;
+        try { await generatePattern(kind); } finally { tile.disabled = false; }
+      });
+      box.appendChild(tile);
+    }
+  } catch (_) { /* gallery unavailable; the rest of the app still works */ }
+})();
+
+$("patUnlimited").addEventListener("change", () => {
+  drawPatRect();
+  if (activePattern) generatePattern(activePattern.kind);
+});
+
+// --- the pattern sizing rectangle: a physical-mm input widget on the stage.
+//     Visible in Pattern mode; SE handle resizes, body drag just repositions
+//     the widget. Red border + label = your stock can't fill it. ---
+const patLayer = window.CapOverlay.attach(document.querySelector(".simwrap"));
+const STAGE_SPAN_MM = 4000;              // the stage width represents 4 m
+let patRect = { w: 1000, h: 750 };       // the piece being sized, in mm
+let patPos = { x: 0.5, y: 0.5 };         // widget centre, stage fractions
+let patDrag = null;                       // {kind:"resize"|"move", ...}
+let patTimer = null;
+
+function stagePx() { return document.querySelector(".simwrap").getBoundingClientRect(); }
+function mmPerPx() { return STAGE_SPAN_MM / Math.max(1, stagePx().width); }
+
+// exact JS mirror of core.geometry.grid_for_frame's cell count
+function cellsForFrame(wMm, hMm, d = 32) {
+  const rp = d * Math.sqrt(3) / 2;
+  if (hMm < d) return 0;
+  let n = 0;
+  const rows = Math.floor((hMm - d) / rp) + 1;
+  for (let r = 0; r < rows; r++) {
+    const usable = wMm - d - (r % 2 ? d / 2 : 0);
+    n += usable >= 0 ? Math.floor(usable / d) + 1 : 0;
+  }
+  return n;
+}
+
+function areaFraction() {
+  const s = shape();
+  if (s === "poly" && polyFrac) {       // shoelace on the drawn outline
+    let a = 0, j = polyFrac.length - 1;
+    for (let i = 0; i < polyFrac.length; i++) {
+      a += (polyFrac[j].x + polyFrac[i].x) * (polyFrac[j].y - polyFrac[i].y);
+      j = i;
+    }
+    return Math.abs(a) / 2;
+  }
+  return { rect: 1, circle: Math.PI / 4, ellipse: Math.PI / 4,
+           diamond: 0.5, hex: 0.75, heart: 0.55 }[s] ?? 1;
+}
+
+function patEstimate() {
+  return Math.round(cellsForFrame(patRect.w, patRect.h) * areaFraction());
+}
+
+function drawPatRect() {
+  patLayer.clear();
+  if (mode() !== "pattern") return;
+  patLayer.sync();
+  const host = stagePx();
+  const scale = 1 / mmPerPx();
+  const w = patRect.w * scale, h = patRect.h * scale;
+  const x = patPos.x * host.width - w / 2, y = patPos.y * host.height - h / 2;
+  const est = patEstimate();
+  const missing = patUnlimited() ? 0 : Math.max(0, est - ownedTotal);
+  const cls = missing > 0 ? " short" : "";
+  const box = patLayer.el("rect", { x, y, width: Math.max(8, w), height: Math.max(8, h),
+                                    class: "patrect" + cls, rx: 6 });
+  box.style.pointerEvents = "all";
+  box.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    patDrag = { kind: "move", x0: e.clientX, y0: e.clientY, pos0: { ...patPos } };
+  });
+  const hd = patLayer.el("circle", { cx: x + w, cy: y + h, r: 8, class: "pathandle" + cls });
+  hd.style.pointerEvents = "all";
+  hd.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    patDrag = { kind: "resize", left: x, top: y };
+  });
+  const label = patLayer.el("text", { x: x + 10, y: Math.max(16, y - 10),
+                                      class: "patlabel" + cls });
+  label.textContent =
+    `${(patRect.w / 1000).toFixed(2)} × ${(patRect.h / 1000).toFixed(2)} m · ~${est.toLocaleString()} caps`
+    + (missing > 0 ? ` · ${missing.toLocaleString()} caps missing` : "");
+}
+
+window.addEventListener("pointermove", (e) => {
+  if (!patDrag) return;
+  const host = stagePx();
+  if (patDrag.kind === "resize") {
+    patRect.w = Math.max(200, (e.clientX - host.left - patDrag.left) * mmPerPx());
+    patRect.h = Math.max(200, (e.clientY - host.top - patDrag.top) * mmPerPx());
+  } else {
+    patPos.x = Math.min(0.95, Math.max(0.05,
+      patDrag.pos0.x + (e.clientX - patDrag.x0) / host.width));
+    patPos.y = Math.min(0.95, Math.max(0.05,
+      patDrag.pos0.y + (e.clientY - patDrag.y0) / host.height));
+  }
+  drawPatRect();
+});
+window.addEventListener("pointerup", () => {
+  if (!patDrag) return;
+  const resized = patDrag.kind === "resize";
+  patDrag = null;
+  if (resized && activePattern) {       // regenerate the pattern at the new size
+    clearTimeout(patTimer);
+    patTimer = setTimeout(() => generatePattern(activePattern.kind), 350);
+  }
+});
+document.querySelectorAll('input[name=mode]').forEach((r) =>
+  r.addEventListener("change", drawPatRect));
+new ResizeObserver(drawPatRect).observe(document.querySelector(".simwrap"));
 
 $("scanBtn").addEventListener("click", async () => {
   const r = await fetch("/scanner/launch", { method: "POST" });
@@ -723,11 +876,15 @@ async function refresh() {
   }
 }
 
-// Show how many caps the scanned inventory holds (feeds the "My scanned caps" group).
+// Show how many caps the scanned inventory holds (feeds the "My scanned caps"
+// group and the sizing rectangle's buildability check).
+let ownedTotal = 0;
 (async function loadCapsCount() {
   try {
     const b = await (await fetch("/caps_count")).json();
+    ownedTotal = b.count;
     $("capsCount").textContent = `(${b.count} scanned)`;
+    drawPatRect();
   } catch (_) { /* leave blank */ }
 })();
 
