@@ -691,6 +691,8 @@ def estimate(
     from_my_caps: bool = False,
     own_threshold: float = 12.0,
     unlimited_stock: bool = False,
+    bg_colors: str | None = None,
+    bg_seeds: str | None = None,
 ) -> dict:
     """Solve one axis from the other in a single call. When both size_mm and
     distance_m are given, size drives the geometry and distance drives the
@@ -707,6 +709,8 @@ def estimate(
                  preset=preset, thicken=thicken, dither=dither,
                  from_my_caps=from_my_caps, own_threshold=own_threshold,
                  unlimited_stock=unlimited_stock)
+    plan, _ = _apply_background(plan, _parse_bg_colors(bg_colors),
+                                _parse_bg_seeds(bg_seeds))
     counts = Counter(tuple(c.rgb) for c in plan.cells if not c.is_hole)
     palette = list(counts.keys())
 
@@ -787,6 +791,58 @@ def _inventory_report(need: Counter) -> tuple[dict, dict]:
     return report, totals
 
 
+@app.get("/pick")
+def pick(
+    image_id: str,
+    fx: float = Query(..., ge=0.0, le=1.0),
+    fy: float = Query(..., ge=0.0, le=1.0),
+    mode: str = "picture",
+    pitch_mm: float = 32.0,
+    size_mm: float | None = Query(None),
+    distance_m: float | None = Query(None),
+    colors: int = 12,
+    bare_white: bool = True,
+    preset: str | None = None,
+    thicken: bool = False,
+    dither: bool = False,
+    from_my_caps: bool = False,
+    own_threshold: float = 12.0,
+    unlimited_stock: bool = False,
+    bg_colors: str | None = None,
+    bg_seeds: str | None = None,
+) -> dict:
+    """Which cap sits under a click on the /simulate PNG? `fx`/`fy` are
+    fractions of the displayed image. Returns the cell's colour plus its
+    background-exclusion state, so the client can toggle colours/regions to
+    bare board without doing any grid or letterbox math of its own."""
+    img = _get(image_id)
+    res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
+    plan = _plan(image_id, img, res["caps_across"], colors, bare_white=bare_white,
+                 preset=preset, thicken=thicken, dither=dither,
+                 from_my_caps=from_my_caps, own_threshold=own_threshold,
+                 unlimited_stock=unlimited_stock)
+    own_fitted = from_my_caps and _DB.exists() and not unlimited_stock
+    if own_fitted:
+        _own_geometry(res, plan)
+    uv = _frame_to_plan_frac(res, plan, fx, fy, distance_m, own_fitted)
+    cell = _cell_at_fraction(plan, *uv) if uv is not None else None
+    if cell is None:
+        return {"hit": False}
+    _, cause = _apply_background(plan, _parse_bg_colors(bg_colors),
+                                 _parse_bg_seeds(bg_seeds))
+    why = cause.get((cell.row, cell.col))
+    return {
+        "hit": True, "row": cell.row, "col": cell.col,
+        "hex": _hex_of(cell.rgb), "color_name": cell.color_name,
+        # cell-CENTRE fractions: what the client stores as a stable seed
+        "fx": round(cell.x_mm / plan.width_mm, 4),
+        "fy": round(cell.y_mm / plan.height_mm, 4),
+        "bare": cell.is_hole,
+        "excluded_by": why[0] if why else None,
+        "seed_index": why[1] if why else None,
+    }
+
+
 @app.get("/simulate")
 def simulate(
     image_id: str,
@@ -806,6 +862,8 @@ def simulate(
     from_my_caps: bool = False,
     own_threshold: float = 12.0,
     unlimited_stock: bool = False,
+    bg_colors: str | None = None,
+    bg_seeds: str | None = None,
 ) -> Response:
     img = _get(image_id)
     res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
@@ -813,6 +871,8 @@ def simulate(
                  preset=preset, thicken=thicken, dither=dither,
                  from_my_caps=from_my_caps, own_threshold=own_threshold,
                  unlimited_stock=unlimited_stock)
+    plan, _ = _apply_background(plan, _parse_bg_colors(bg_colors),
+                                _parse_bg_seeds(bg_seeds))
     own_mode = from_my_caps and _DB.exists()
     own_fitted = own_mode and not unlimited_stock  # small fitted piece vs full size
     if own_fitted:
@@ -931,6 +991,8 @@ def capmap(
     preset: str | None = None,
     thicken: bool = False,
     dither: bool = False,
+    bg_colors: str | None = None,
+    bg_seeds: str | None = None,
     format: str = "png",
 ) -> Response:
     """Printable paint-by-numbers cap map (PNG or PDF) for the current plan."""
@@ -938,6 +1000,8 @@ def capmap(
     res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
     plan = _plan(image_id, img, res["caps_across"], colors, bare_white=bare_white,
                  preset=preset, thicken=thicken, dither=dither)
+    plan, _ = _apply_background(plan, _parse_bg_colors(bg_colors),
+                                _parse_bg_seeds(bg_seeds))
     sheet = render_cap_map(plan)
     buf = io.BytesIO()
     if format.lower() == "pdf":
