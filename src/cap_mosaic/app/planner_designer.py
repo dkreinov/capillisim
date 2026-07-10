@@ -518,6 +518,31 @@ def _resample_linear(img: Image.Image, w: int, h: int) -> Image.Image:
     return Image.fromarray(out, "RGB")
 
 
+def framed_box(
+    mosaic_px: tuple[int, int],
+    mosaic_width_mm: float,
+    distance_m: float,
+    frame_px: tuple[int, int],
+    fov_deg: float = 50.0,
+) -> tuple[int, int, int, int]:
+    """(x0, y0, w, h): where the distance-resampled mosaic lands in the frame.
+
+    One function owns the letterbox arithmetic so the forward render
+    (view_at_distance) and any inverse mapping (frame pixel -> mosaic
+    fraction, e.g. picking a cap in the web preview) can never disagree.
+    """
+    frame_w, frame_h = frame_px
+    mw, mh = mosaic_px
+    frac = apparent_fraction(mosaic_width_mm / 1000.0, distance_m, fov_deg)
+
+    target_w = max(1, int(round(frac * frame_w)))
+    target_h = max(1, int(round(target_w * mh / mw)))
+    if target_h > frame_h:  # keep the whole mosaic inside the frame
+        target_h = frame_h
+        target_w = max(1, int(round(target_h * mw / mh)))
+    return (frame_w - target_w) // 2, (frame_h - target_h) // 2, target_w, target_h
+
+
 def view_at_distance(
     mosaic: Image.Image,
     mosaic_width_mm: float,
@@ -534,19 +559,11 @@ def view_at_distance(
     light, so the colour mixing is physically correct (not a growing blur). The
     surround is left as bare board colour.
     """
-    frame_w, frame_h = frame_px
-    frac = apparent_fraction(mosaic_width_mm / 1000.0, distance_m, fov_deg)
-    mw, mh = mosaic.size
-
-    target_w = max(1, int(round(frac * frame_w)))
-    target_h = max(1, int(round(target_w * mh / mw)))
-    if target_h > frame_h:  # keep the whole mosaic inside the frame
-        target_h = frame_h
-        target_w = max(1, int(round(target_h * mw / mh)))
-
+    x0, y0, target_w, target_h = framed_box(
+        mosaic.size, mosaic_width_mm, distance_m, frame_px, fov_deg)
     resized = _resample_linear(mosaic, target_w, target_h)
-    frame = Image.new("RGB", (frame_w, frame_h), board)
-    frame.paste(resized, ((frame_w - target_w) // 2, (frame_h - target_h) // 2))
+    frame = Image.new("RGB", frame_px, board)
+    frame.paste(resized, (x0, y0))
     return frame
 
 
