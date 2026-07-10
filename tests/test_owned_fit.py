@@ -108,3 +108,26 @@ def test_fit_path_uses_few_colours_and_fills_X_cells():
 
     assert distinct <= len(usable) < len(groups)    # far fewer colours than all groups
     assert filled >= 0.80 * X and filled <= X       # ~X cells filled, capped by stock
+
+
+def test_fit_caps_across_masked_hits_target_through_a_circle():
+    from cap_mosaic.app.planner_designer import fit_caps_across_masked
+    from cap_mosaic.core.shapes import mask_grid, shape_mask
+
+    def keep_for(grid):
+        return mask_grid(grid, shape_mask("circle", grid.width_mm, grid.height_mm))
+
+    import math
+    for target in (60, 200, 500):
+        ca = fit_caps_across_masked(target, 1.0, keep_for=keep_for,
+                                    area_fraction=math.pi / 4.0)
+        got = keep_for(grid_for_caps_across(ca, 1.0, Cap())).count
+        assert abs(got - target) <= max(3, 0.1 * target), (target, ca, got)
+
+
+def test_fit_caps_across_masked_none_matches_unmasked():
+    from cap_mosaic.app.planner_designer import fit_caps_across_masked
+
+    for n in (10, 60, 200, 777):
+        for aspect in (0.75, 1.0, 1.5):
+            assert fit_caps_across_masked(n, aspect) == fit_caps_across(n, aspect)

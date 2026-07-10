@@ -8,6 +8,7 @@ fully testable. It depends on Pillow + numpy but stays otherwise self-contained.
 from __future__ import annotations
 
 import math
+from typing import Callable
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
@@ -384,23 +385,49 @@ def usable_groups(groups, image: Image.Image, threshold_de: float, filter_k: int
 
 def fit_caps_across(n_caps: int, aspect: float) -> int:
     """Caps-across for a grid that totals about `n_caps` cells at width/height =
-    `aspect`.
+    `aspect`. See fit_caps_across_masked; this is the unmasked (full-rectangle)
+    case."""
+    return fit_caps_across_masked(n_caps, aspect)
 
-    Inverts the hex-packing count (``count ≈ caps_across² / (aspect ·
-    HEX_CELL_AREA_FACTOR)``) for a first estimate, then searches a small window
-    of caps-across values for the one whose ACTUAL laid-out grid totals closest
-    to `n_caps` — the closed form ignores the frame's edge losses and so
-    consistently undershoots. Returns a caps-across >= 1. Cell count is
-    independent of cap diameter, so a default cap is used.
+
+def fit_caps_across_masked(
+    n_caps: int, aspect: float,
+    keep_for: Callable[[Grid], Grid] | None = None,
+    area_fraction: float = 1.0,
+) -> int:
+    """Caps-across for a (possibly shape-masked) grid totalling ~`n_caps` cells.
+
+    Inverts the hex-packing count (``count ≈ caps_across² · area_fraction /
+    (aspect · HEX_CELL_AREA_FACTOR)``, the rectangle count scaled by the
+    shape's share of it) for a first estimate, then
+    searches a small window of caps-across values for the one whose ACTUAL
+    laid-out (and masked) grid totals closest to `n_caps` — the closed form
+    ignores edge losses and consistently undershoots. `keep_for` is a factory
+    applying the shape mask to a candidate grid (the mask depends on the
+    candidate's own width/height, so it must be rebuilt per grid). Cell count
+    is independent of cap diameter, so a default cap is used.
     """
     if n_caps < 1:
         raise ValueError("n_caps must be >= 1")
     if aspect <= 0:
         raise ValueError("aspect must be positive")
-    est = max(1, round(math.sqrt(n_caps * aspect * HEX_CELL_AREA_FACTOR)))
+    if not (0.0 < area_fraction <= 1.0):
+        raise ValueError("area_fraction must be in (0, 1]")
+    est = max(1, round(math.sqrt(n_caps * aspect * HEX_CELL_AREA_FACTOR
+                                 / area_fraction)))
+
+    def count(ca: int) -> int:
+        grid = grid_for_caps_across(ca, aspect, Cap())
+        if keep_for is not None:
+            try:
+                grid = keep_for(grid)
+            except ValueError:  # shape leaves no cells at this candidate size
+                return 0
+        return grid.count
+
     best, best_err = est, None
     for ca in range(max(1, est - 4), est + 8):
-        err = abs(grid_for_caps_across(ca, aspect, Cap()).count - n_caps)
+        err = abs(count(ca) - n_caps)
         if best_err is None or err < best_err:
             best, best_err = ca, err
     return best
