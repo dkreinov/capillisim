@@ -243,6 +243,35 @@ def test_own_threshold_simulate_renders(own_db):
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
 
 
+def test_unlimited_stock_full_size_no_holes(own_db):
+    # "assume unlimited stock": full slider-resolution piece, every cell filled
+    # from the owned palette, no stock-limit holes — much bigger than the fitted
+    # (count-limited) caps-I-own piece for the same size.
+    iid = _upload_rgb_blocks()
+    p = {"image_id": iid, "size_mm": 2000, "from_my_caps": True}
+    fitted = client.get("/estimate", params={**p, "own_threshold": 12}).json()
+    unl = client.get("/estimate", params={**p, "unlimited_stock": True}).json()
+
+    assert unl["caps_across"] > fitted["caps_across"]     # full res, not shrunk to stock
+    assert unl["total_caps"] > fitted["total_caps"]
+    assert unl["holes"] == 0                              # no white in the blocks image
+    assert unl["stock_used"]["unlimited"] is True
+    # can use more colours than the count-limited plan (whole owned palette available)
+    assert unl["colors_used"] >= fitted["colors_used"]
+
+
+def test_unlimited_stock_simulate_is_distance_framed(own_db):
+    # unlimited stock is a FULL-size piece, so (unlike the fitted piece) the
+    # distance view shrinks it into the fixed FOV frame.
+    import io as _io
+    iid = _upload_rgb_blocks()
+    r = client.get("/simulate", params={"image_id": iid, "size_mm": 2000,
+                                        "distance_m": 6.0, "from_my_caps": True,
+                                        "unlimited_stock": True})
+    assert r.status_code == 200
+    assert Image.open(_io.BytesIO(r.content)).size == server._FRAME_PX
+
+
 def test_own_simulate_shows_sharp_piece_not_distance_speck(own_db):
     # regression: the fitted caps-I-own piece is small (few owned caps), so
     # shrinking it into the fixed FOV frame at the slider distance made it a

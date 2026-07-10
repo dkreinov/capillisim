@@ -26,13 +26,18 @@ function fromMyCaps() {
 }
 function colorsN() { return Math.max(4, Math.min(24, Number($("colorsN").value) || 12)); }
 function ownThreshold() { return Math.max(2, Math.min(30, Number($("ownThr").value) || 12)); }
+function unlimitedStock() { return $("unlimitedStock").checked; }
 function extraParams() {
   const p = { bg_color: bgColor(), dither: dither(), colors: colorsN() };
   if (preset()) p.preset = preset();
   if (thicken()) p.thicken = true;
   if (realOnly()) p.real_only = true;
   if (useInv()) p.inventory = true;
-  if (fromMyCaps()) { p.from_my_caps = true; p.own_threshold = ownThreshold(); }
+  if (fromMyCaps()) {
+    p.from_my_caps = true;
+    p.own_threshold = ownThreshold();
+    if (unlimitedStock()) p.unlimited_stock = true;
+  }
   return p;
 }
 
@@ -258,6 +263,7 @@ $("dither").addEventListener("change", refresh);
 $("useInv").addEventListener("change", refresh);
 $("colorsN").addEventListener("change", refresh);
 $("ownThr").addEventListener("input", () => { $("ownThrVal").textContent = ownThreshold(); debounced(); });
+$("unlimitedStock").addEventListener("change", () => { syncCapsMode(); refresh(); });
 // buttons/links that live inside a collapsible <summary> must not toggle it
 ["askLLM", "aiSimplify", "capmap"].forEach((id) => {
   const el = $(id);
@@ -270,7 +276,9 @@ let realOnlyBeforeLock = null;
 function syncCapsMode() {
   const mine = fromMyCaps();
   const ro = $("realOnly");
-  $("ownThrRow").hidden = !mine;   // threshold slider only applies in caps-I-own mode
+  $("ownOptsRow").hidden = !mine;   // caps-I-own options only apply in that mode
+  // the match-tolerance slider is meaningless when we assume unlimited stock
+  $("ownThrLabel").style.display = mine && !unlimitedStock() ? "" : "none";
   if (mine) {
     if (realOnlyBeforeLock === null) realOnlyBeforeLock = ro.checked;
     ro.checked = true; ro.disabled = true;
@@ -434,11 +442,15 @@ async function refresh() {
   const lines = [];
   if (b.stock_used) {
     const s = b.stock_used;
-    lines.push(`designed from your caps: placing ${s.used} of the ${s.owned} you own`);
-    // caps-I-own group readout: how many caps qualify + how many colours result,
-    // both of which move as the match-tolerance slider changes
-    $("usableNote").textContent =
-      `using ${s.used} of ${s.owned} caps · ${b.colors_used} colour${b.colors_used === 1 ? "" : "s"}`;
+    const cols = `${b.colors_used} colour${b.colors_used === 1 ? "" : "s"}`;
+    if (s.unlimited) {
+      lines.push(`assuming unlimited stock: needs ${s.used.toLocaleString()} caps`);
+      $("usableNote").textContent = `unlimited stock: needs ${s.used.toLocaleString()} caps · ${cols}`;
+    } else {
+      lines.push(`designed from your caps: placing ${s.used} of the ${s.owned} you own`);
+      // caps-I-own readout: caps qualifying + colours, both move with the slider
+      $("usableNote").textContent = `using ${s.used} of ${s.owned} caps · ${cols}`;
+    }
   } else {
     $("usableNote").textContent = "";
   }
@@ -476,7 +488,7 @@ async function refresh() {
   const mq = new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, size_mm: sizeMm(), ...extraParams(), format: "pdf" });
   $("capmap").href = "/capmap?" + mq.toString();
   $("palcmp").href = "/palettes?" + new URLSearchParams({ image_id: imageId, mode: mode(), pitch_mm: PITCH, size_mm: sizeMm(), dither: dither() }).toString();
-  if (fromMyCaps()) {
+  if (fromMyCaps() && !unlimitedStock()) {
     // the piece is sized by how many caps you own, not the slider — show the
     // real fitted mosaic (no distance shrink), so report the derived piece
     const w = (b.width_mm / 1000).toFixed(2);

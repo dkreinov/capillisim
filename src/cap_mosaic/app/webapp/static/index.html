@@ -65,8 +65,9 @@
               <span class="planlabel">Plan the mosaic from:</span>
               <label data-tip="The plan picks whatever colours suit the image best. Use the shopping list below to see how far your collection covers it."><input type="radio" name="planFrom" value="ideal" checked /> Best-fit colours (ideal palette)</label>
               <label data-tip="Builds from your real stock. Duplicates ARE all usable — if you own 30 of a colour, up to 30 cells can use it; 'placed once' only means a single physical cap can't go in two cells. The grid shrinks so its cell count matches how many of your caps are usable, so the picture reads instead of drowning in holes. When a colour runs out, the leftover cells stay bare board."><input type="radio" name="planFrom" value="mine" /> Only caps I own — build from my real stock</label>
-              <div class="ownthr" id="ownThrRow" hidden>
-                <label data-tip="How close (perceptual ΔE) a cap's colour must be to a colour the image needs before it counts as usable. Lower = only near-perfect matches qualify (smaller, truer piece); higher = looser matches join in (bigger, but muddier). Caps too far stay in the box.">Match tolerance (ΔE)
+              <div class="ownopts" id="ownOptsRow" hidden>
+                <label class="chk" data-tip="Ignore how many caps you own and assume you have ENOUGH of every colour you own. Builds the full-size piece at the size-slider resolution — each cell takes the nearest colour in your collection, no holes. Shows the best case if you topped up your stock."><input type="checkbox" id="unlimitedStock" /> Assume unlimited stock</label>
+                <label id="ownThrLabel" data-tip="How close (perceptual ΔE) a cap's colour must be to a colour the image needs before it counts as usable. Lower = only near-perfect matches qualify (smaller, truer piece); higher = looser matches join in (bigger, but muddier). Caps too far stay in the box.">Match tolerance (ΔE)
                   <input type="range" id="ownThr" min="2" max="30" step="1" value="12" />
                   <output id="ownThrVal">12</output>
                 </label>

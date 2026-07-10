@@ -226,6 +226,8 @@ h1 span { color:var(--mut); font:400 13px/1 var(--font-body); }
 .planfrom { display:flex; flex-direction:column; gap:5px; color:var(--mut); margin-bottom:var(--s3); }
 .planfrom .planlabel { font-size:12px; color:var(--ink); font-weight:600; }
 .planfrom label { display:flex; align-items:center; gap:6px; cursor:pointer; }
+/* caps-I-own sub-options, indented under the "Only caps I own" radio */
+.ownopts { display:flex; flex-direction:column; gap:5px; padding-left:22px; }
 .mutnote { color:var(--mut); font-size:12px; }
 .mode { display:flex; gap:var(--s4); margin-bottom:var(--s3); color:var(--mut); }
 .slider { display:block; margin:var(--s3) 0; color:var(--mut); }

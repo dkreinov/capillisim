@@ -130,24 +130,38 @@ def _floor(image_id: str, img: Image.Image, mode: str) -> int:
 def _plan(image_id: str, img: Image.Image, caps_across: int, colors: int,
           bare_white: bool = True, preset: str | None = None, thicken: bool = False,
           dither: bool = False, from_my_caps: bool = False,
-          own_threshold: float = 12.0):
+          own_threshold: float = 12.0, unlimited_stock: bool = False):
     caps_across = max(1, min(caps_across, _MAX_CAPS_ACROSS))
     key = (image_id, caps_across, colors, bare_white, preset, thicken, dither,
-           from_my_caps, own_threshold)
+           from_my_caps, own_threshold, unlimited_stock)
     if key not in _PLANS:
         grid = grid_for_caps_across(caps_across, img.width / img.height, Cap())
         if from_my_caps and _DB.exists():
+            from ..cap_stock import load_stock
+
+            groups = load_stock(str(_DB))
+            if unlimited_stock:
+                # "assume unlimited stock": use every owned cap COLOUR as an
+                # unlimited palette on the full slider-resolution grid — each cell
+                # takes its nearest owned colour, no count limit / holes. Shows the
+                # best case if you had enough of every colour you own.
+                from ...core.palette import CapColor
+
+                palette = tuple(CapColor(g.label, tuple(int(v) for v in g.rgb))
+                                for g in groups)
+                _PLANS[key] = plan_from_image(img, grid, palette=palette,
+                                              bare_white=bare_white,
+                                              thicken_outlines=thicken, dither=dither)
+                return _PLANS[key]
             # "Only caps I own": keep the owned caps within own_threshold ΔE00 of
             # a colour the image needs, then SHRINK the grid so its cell count ~
             # the usable-cap count, so each owned cap fills one cell and the image
             # reads instead of drowning in holes. The size slider's resolution is
             # overridden by this derived piece (see caps-own-fit-plan.md).
-            from ..cap_stock import load_stock
             from ..planner_designer import (
                 fit_caps_across, plan_from_inventory, usable_groups,
             )
 
-            groups = load_stock(str(_DB))
             usable = usable_groups(groups, img, own_threshold,
                                    filter_k=max(colors, 16))
             if not usable:  # threshold excludes every cap — fall back to full stock
@@ -535,6 +549,7 @@ def estimate(
     inventory: bool = False,
     from_my_caps: bool = False,
     own_threshold: float = 12.0,
+    unlimited_stock: bool = False,
 ) -> dict:
     """Solve one axis from the other in a single call. When both size_mm and
     distance_m are given, size drives the geometry and distance drives the
@@ -549,12 +564,16 @@ def estimate(
 
     plan = _plan(image_id, img, res["caps_across"], colors, bare_white=bare_white,
                  preset=preset, thicken=thicken, dither=dither,
-                 from_my_caps=from_my_caps, own_threshold=own_threshold)
+                 from_my_caps=from_my_caps, own_threshold=own_threshold,
+                 unlimited_stock=unlimited_stock)
     counts = Counter(tuple(c.rgb) for c in plan.cells if not c.is_hole)
     palette = list(counts.keys())
 
     own_mode = from_my_caps and _DB.exists()
-    if own_mode:
+    # the count-limited "own" plan is a small FITTED piece; unlimited-stock keeps
+    # the full slider-size piece (like the ideal palette), so its geometry stands.
+    own_fitted = own_mode and not unlimited_stock
+    if own_fitted:
         # the fitted piece (grid sized to usable caps) overrides the slider size
         _own_geometry(res, plan)
     view_d = res.get("distance_m") or res.get("recommended_distance_m") or 5.0
@@ -564,7 +583,7 @@ def estimate(
         used = sum(1 for c in plan.cells if not c.is_hole)
         from ..planner_designer import load_inventory
         res["stock_used"] = {"used": used, "owned": len(load_inventory(str(_DB))),
-                             "usable": plan.count}
+                             "usable": plan.count, "unlimited": unlimited_stock}
 
     # Report caps you actually buy: the area estimate counts the whole panel, but
     # a removed/bare-white background leaves holes with no cap. total_caps is the
@@ -645,14 +664,17 @@ def simulate(
     highlight: str | None = None,
     from_my_caps: bool = False,
     own_threshold: float = 12.0,
+    unlimited_stock: bool = False,
 ) -> Response:
     img = _get(image_id)
     res = _solve(img, image_id, mode, pitch_mm, size_mm, distance_m)
     plan = _plan(image_id, img, res["caps_across"], colors, bare_white=bare_white,
                  preset=preset, thicken=thicken, dither=dither,
-                 from_my_caps=from_my_caps, own_threshold=own_threshold)
+                 from_my_caps=from_my_caps, own_threshold=own_threshold,
+                 unlimited_stock=unlimited_stock)
     own_mode = from_my_caps and _DB.exists()
-    if own_mode:
+    own_fitted = own_mode and not unlimited_stock  # small fitted piece vs full size
+    if own_fitted:
         # the fitted piece drives tile sizing + physical width, not the slider
         _own_geometry(res, plan)
     # adapt tile pixels to how many caps there are, so a bigger piece shows more
@@ -673,12 +695,13 @@ def simulate(
     hi = _hex_rgb(highlight, None) if highlight else None
     mosaic = render_mosaic_caps(plan, lib, px_per_cap=px_per_cap, background=board,
                                 real_only=real_only, highlight=hi)
-    if distance_m is not None and not own_mode:
+    if distance_m is not None and not own_fitted:
         # Shrink the sharp mosaic into a fixed FOV frame; caps merge via the
-        # linear-light resample rather than a growing blur. Skipped in caps-I-own
-        # mode: the piece is sized by how many caps you own (often small, e.g. a
-        # few hundred caps ~ 0.4 m), so a distant view would shrink it to a speck.
-        # Showing the sharp fitted mosaic is what the builder actually needs.
+        # linear-light resample rather than a growing blur. Skipped only for the
+        # FITTED caps-I-own piece: it is sized by how many caps you own (often
+        # small, e.g. a few hundred caps ~ 0.4 m), so a distant view would shrink
+        # it to a speck. Unlimited-stock is full-size, so distance applies as
+        # usual. Showing the sharp fitted mosaic is what the builder needs.
         mosaic = view_at_distance(mosaic, res["width_mm"], distance_m, _FRAME_PX,
                                   board=_STAGE_BG)
     buf = io.BytesIO()
