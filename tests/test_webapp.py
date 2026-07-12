@@ -176,15 +176,38 @@ def test_scanner_launch_spawns_the_capture_app(monkeypatch):
     def fake_popen(args, **kw):
         spawned["args"] = args
         spawned["kw"] = kw
-        class P:  # noqa: N801 - minimal stand-in
+        class P:  # noqa: N801 - stand-in for a healthy long-running scanner
             pid = 4242
+            stdout = None
+            def poll(self):
+                return None
         return P()
 
     monkeypatch.setattr(subprocess, "Popen", fake_popen)
-    r = client.post("/scanner/launch")
+    r = client.post("/scanner/launch", params={"camera": 2})
     assert r.status_code == 200 and r.json()["launched"] is True
     joined = " ".join(spawned["args"])
     assert "cap_mosaic.app.cap_capture" in joined and "--auto" in joined
+    assert "--camera 2" in joined
+
+
+def test_scanner_launch_reports_camera_failure(monkeypatch):
+    import io as _io
+    import subprocess
+
+    def fake_popen(args, **kw):
+        class P:  # noqa: N801 - a scanner that dies immediately
+            pid = 4243
+            returncode = 1
+            stdout = _io.StringIO("could not open camera index 0\n")
+            def poll(self):
+                return 1
+        return P()
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+    b = client.post("/scanner/launch").json()
+    assert b["launched"] is False
+    assert "could not open camera" in b["error"]
 
 
 def test_pattern_and_palette_prompt_from_stock(tmp_path, monkeypatch):
