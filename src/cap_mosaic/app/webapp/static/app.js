@@ -577,9 +577,16 @@ window.addEventListener("pointerup", () => {
 new ResizeObserver(drawPatRect).observe(document.querySelector(".simwrap"));
 
 $("scanBtn").addEventListener("click", async () => {
-  const r = await fetch("/scanner/launch", { method: "POST" });
+  const cam = Math.max(0, Math.min(9, Number($("camIdx").value) || 0));
+  toast("Starting the scanner…");
+  const r = await fetch("/scanner/launch?camera=" + cam, { method: "POST" });
   if (!r.ok) { toast("Could not start the scanner"); return; }
-  toast("Scanner opening in its own window on this computer — place a cap on the card; Q there to finish.");
+  const b = await r.json();
+  if (!b.launched) {
+    toast(`Scanner failed: ${b.error} — try another camera number, or see docs/CONNECT_PHONE.md for using your phone.`);
+    return;
+  }
+  toast("Scanner open in its own window — place a cap on the card; Q there to finish.");
 });
 
 $("copyPrompt").addEventListener("click", async () => {

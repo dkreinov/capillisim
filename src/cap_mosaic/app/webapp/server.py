@@ -556,24 +556,34 @@ def caps_count() -> dict:
 
 
 @app.post("/scanner/launch")
-def scanner_launch() -> dict:
+def scanner_launch(camera: int = 0) -> dict:
     """Open the cap-scanning camera app on this computer.
 
     The server runs on the user's own machine, so spawning the OpenCV capture
-    window locally is exactly what "scan more caps" means here. Detached: the
-    scanner outlives web requests and closes from its own window (Q).
+    window locally is exactly what "scan more caps" means here. The scanner
+    outlives web requests and closes from its own window (Q).
+
+    Output is piped so an early death (typically "could not open camera") is
+    reported back to the browser instead of flashing past in a console.
     """
     import subprocess
     import sys
+    import time
 
     args = [sys.executable, "-m", "cap_mosaic.app.cap_capture",
-            "--out", "dataset", "--auto"]
-    kw = {"cwd": str(Path.cwd()),
-          "env": {**os.environ, "PYTHONPATH": "src"}}
-    if sys.platform == "win32":
-        kw["creationflags"] = subprocess.CREATE_NEW_CONSOLE
-    p = subprocess.Popen(args, **kw)  # noqa: S603 - fixed local command
-    return {"launched": True, "pid": p.pid}
+            "--out", "dataset", "--auto", "--camera", str(camera)]
+    p = subprocess.Popen(  # noqa: S603 - fixed local command
+        args, cwd=str(Path.cwd()),
+        env={**os.environ, "PYTHONPATH": "src"},
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    # give it a moment: a camera failure exits within a second or two
+    for _ in range(10):
+        time.sleep(0.3)
+        if p.poll() is not None:
+            out = (p.stdout.read() if p.stdout else "") or ""
+            tail = out.strip().splitlines()[-1] if out.strip() else f"exit code {p.returncode}"
+            return {"launched": False, "camera": camera, "error": tail}
+    return {"launched": True, "pid": p.pid, "camera": camera}
 
 
 # ── inventory browser: view the cap DB, delete mis-scans with the mouse ──────

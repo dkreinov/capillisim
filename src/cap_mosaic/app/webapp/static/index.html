@@ -77,6 +77,8 @@
           <div class="menu-panel">
             <div class="gheadrow">My scanned caps <span id="capsCount"></span>
               <button id="scanBtn" class="btn-gold gbtn" data-tip="Open the cap-scanning camera window on this computer. Place caps on the printed reading card; it auto-saves each one. Press Q in that window to finish.">📷 Scan caps</button>
+              <label class="camrow" data-tip="Which camera the scanner opens: 0 = the default webcam, 1+ = other cameras (e.g. a phone-camera app).">cam
+                <input type="number" id="camIdx" min="0" max="9" step="1" value="0" /></label>
               <a class="capmaplink gbtn" href="/inventory" target="_blank" rel="noopener" data-tip="Browse every scanned cap, check its colours and size, and delete mis-scans.">🗂 Browse</a>
             </div>
             <div class="planfrom">
