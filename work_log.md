@@ -240,3 +240,41 @@ Started: 2026-07-12 · Mode: autonomous
 - Total steps: 7 · Completed: 7 · Failed: 0
 - Commits: b066aed, ae3e1ed, 27138cc, a81d4ca, 757fa02, cb9f810, <this> (main, NOT pushed)
 - Deviations: gitignore anchor (Step 1); server.py refactor for test (Step 7); shots.js lives outside repo so untracked (Step 3)
+
+---
+
+# Task: Beer-image hard-zoom GIF + pipeline strip — plans/beer-zoom-plan.md
+Started: 2026-07-12 · Mode: autonomous (push gated at Step 6)
+
+## Step 1: generate beer/hops source
+- Status: ✅ Complete — Qwen produced a bold flat beer mug + hops poster (1328², first try), uploaded for image_id. docs/images/beer-source.png committed.
+- Files changed: docs/images/beer-source.png
+
+## Step 2: verify cap-level render + target
+- Status: ✅ Complete — detail render 4800px (~48px/cap); hard crop shows unmistakable individual caps (real photos). Frozen params: size_mm=3200, colors=12, dither=true. Zoom target fx≈0.44, fy≈0.40 (mug/foam edge, multi-colour). far render 900×650 for the "reads as picture" panel.
+- Files changed: none (scratch renders)
+
+## Step 3: zoom GIF
+- Status: ✅ Complete — walk-in + hard cap-zoom + ping-pong; reaches unmistakable individual caps; first frame reads as a picture. 480px, 2.8 MB, ~37 frames after optimize.
+- Files changed: docs/images/zoom-walk.gif
+
+## Step 1b/3b: subject change -> Tyrion + real caps (user directives mid-run)
+- Status: ✅ Complete — user swapped subject to Tyrion-with-beer (closer likeness; IP flagged & user-approved) and required real caps not procedural circles. Generated tyrion-source.png (Qwen t2i, new rendition), rebuilt zoom-walk.gif with real_only=true, target mug/doublet (0.30,0.52). Far frame reads as the character; close frames are real branded caps. 2.9 MB. Retired beer-source.png.
+- Deviations: subject/params changed from the beer-mug plan; real_only added (both user-directed).
+- Files changed: docs/images/tyrion-source.png (new), docs/images/zoom-walk.gif, docs/images/beer-source.png (removed)
+
+## Step 4: pipeline strip (Tyrion, real caps)
+- Status: ✅ Complete — pipeline-tyrion.jpg 1894×518: artwork → 11,352-cap full mosaic → real-caps-up-close (branded caps) → from across the room. Panel 3 shows genuine individual caps.
+- Files changed: docs/images/pipeline-tyrion.jpg (new)
+
+## Step 5: rewire refs + retire lion pipeline
+- Status: ✅ Complete — README + GUIDE point at pipeline-tyrion.jpg with new captions; pipeline-lion.jpg removed; no stale refs; all image refs resolve. Other "lion" mentions left (they refer to shapes.png/bg-click.png lion examples, still accurate).
+- Files changed: README.md, docs/GUIDE.md, docs/images/pipeline-lion.jpg (removed)
+
+## Step 6: final review (push gated)
+- Status: ✅ Complete — reviewed all three outputs: zoom-walk.gif (2.97 MB, reaches real branded caps, far frame reads as the character), pipeline-tyrion.jpg (panel 3 = genuine real caps), tyrion-source.png. No refs to removed files. Working tree clean. STOPPING before push per Hard Rule #10.
+
+## Final Summary (beer/Tyrion zoom)
+- Steps: 6 completed (Steps 1/3 redone after subject→Tyrion + real_only corrections).
+- Commits (unpushed): edacfcf, 75f62c8, ac25abb, 63e0416, 365e2eb + work_log.
+- Key decisions: subject Tyrion-with-beer closer-likeness (IP flagged, user-approved); real_only caps (no procedural circles); non-lion.
